@@ -60,7 +60,7 @@ def collector():
     with open('../data.json') as file:
         data = json.load(file)
         data.append({
-        'Date' : now.strftime("%Y-%m-%d %H:%M"),
+        'Date' : now.strftime("%Y-%m-%d %H:%M:%S"),
         'Symbol' : 'BTC-USD',
         'Price' : averagePrice
     })
