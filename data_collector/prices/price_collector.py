@@ -7,7 +7,6 @@ from time import sleep
 
 from coinbase.wallet.client import Client
 
-
 from dotenv import load_dotenv
 from pathlib import Path  # python3 only
 env_path = Path('.') / 'prices/config/coinbase.env'

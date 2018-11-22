@@ -1,0 +1,9 @@
+[
+    {
+        "created_at": "Wed Nov 21 21:43:40 +0000 2018",
+        "favorite_count": 0,
+        "reply_count": 0,
+        "retweet_count": 0,
+        "text": "free bitcoin more mining yours get hash power now eth coins dualmining  https://t.co/qtronTjqY7"
+    }
+]
