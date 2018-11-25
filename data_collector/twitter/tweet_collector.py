@@ -2,22 +2,23 @@ from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
 import os, json, re
-import pandas as pd
-import emoji as ji
 
+# Provides list of unicode emojis for extraction
+import emoji as ji
  
 from dotenv import load_dotenv
 from pathlib import Path  # python3 only
-env_path = Path('.') / 'twitter.env'
+env_path = Path('.') / 'config/twitter.env'
 load_dotenv(dotenv_path=env_path)
 
 class keys():
 
     def __init__(self):
-        self.api_key = os.getenv('API_KEY')
+        self.api_key = os.getenv("API_KEY")
         self.api_secret = os.getenv("API_SECRET")
         self.access_token = os.getenv("ACCESS_TOKEN")
         self.access_secret = os.getenv("ACCESS_SECRET")
+        self.currency_hashtags = os.getenv("CURRENCY_HASHTAGS")
 
 class utilityFuncs():
 
@@ -26,13 +27,10 @@ class utilityFuncs():
 
     def cleanTweet(self, text):
         # Function to clean tweets, removes links and special characters
-        return re.sub(r'( +)', ' ', re.sub(r'([^0-9A-Za-z \s])|(@[A-Za-z0-9]+)|(http\S+)', '', text), ' '.join(c for c in text if c in ji.UNICODE_EMOJI))
-
-
-    def emojiUnicode(self):
-        with open('unicode.txt', 'r') as file:
-            self.unicode = file.read().replace('\n', '')
-        return self.unicode
+        return re.sub(r'([^0-9A-Za-z \t])|(@[A-Za-z0-9]+)|(http\S+)', '', text), ' '.join(c for c in text if c in ji.UNICODE_EMOJI)
+    
+    def removeSpacing(self, text):
+        return re.sub(r'( +)', ' ', text)
 
 class Streamer():
 
@@ -44,7 +42,7 @@ class Streamer():
         auth = OAuthHandler(keys().api_key, keys().api_secret)
         auth.set_access_token(keys().access_token, keys().access_secret)
         stream = Stream(auth, listener, tweet_mode='extended')
-        stream.filter(track=hashtag)
+        stream.filter(languages=["en"], track=hashtag)
 
 class Listener(StreamListener):
     
@@ -53,9 +51,8 @@ class Listener(StreamListener):
     
     def on_data(self, data):
 
-        tweet_data = []
         data = json.loads(data)
-        
+
         try:
             # Check if tweet is a retweet
             if 'retweeted_status' in data:
@@ -73,21 +70,25 @@ class Listener(StreamListener):
                     text = data['text']
             
             tweet = utilityFuncs().cleanTweet(text)
+            tweetText = utilityFuncs().removeSpacing(tweet[0])
+
+            tweet = tweetText+' '+tweet[1]
 
             print(tweet)
 
             try:
+                with open(self.tweets_file) as file:
+                    tweet_data = json.load(file)
                 tweet_data.append({
                     'created_at'    : data['created_at'],
-                    'text'          : data['retweeted_status']['extended_tweet']['full_text'],
+                    'text'          : tweet,
                     'reply_count'   : data['reply_count'],
                     'retweet_count' : data['retweet_count'],
                     'favorite_count': data['favorite_count']
                 })
-                print(data)
-                with open(self.tweets_file, 'w+') as file:
+
+                with open(self.tweets_file, 'w') as file:
                     json.dump(tweet_data, file, sort_keys=True, indent=4)
-                    #file.write(data)
                 return True
             except BaseException as exception:
                 print("Error: %s" % str(exception))
@@ -106,6 +107,7 @@ if __name__ == '__main__':
  
     hashtag = ["Bitcoin", "bitcoin"]
     tweets_file = "tweets.json"
+    tweet_data = []
 
     twitter_streamer = Streamer()
     twitter_streamer.stream_tweets(tweets_file, hashtag)
