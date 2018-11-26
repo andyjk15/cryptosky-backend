@@ -9,7 +9,7 @@ from coinbase.wallet.client import Client
 
 from dotenv import load_dotenv
 from pathlib import Path  # python3 only
-env_path = Path('.') / 'prices/config/coinbase.env'
+env_path = Path('.') / 'data_collector/prices/config/coinbase.env'
 load_dotenv(dotenv_path=env_path)
 
 class keys():
@@ -17,7 +17,6 @@ class keys():
     def __init__(self):
         self.api_key = os.getenv('API_KEY')
         self.api_secret = os.getenv("API_SECRET")
-
 
 def coinbase():
 
@@ -56,7 +55,7 @@ def collector():
     now = datetime.datetime.now()
 
     print("Loading existing data")
-    with open('../data.json') as file:
+    with open('data_collector/price.json') as file:
         data = json.load(file)
         data.append({
         'Date' : now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -64,7 +63,7 @@ def collector():
         'Price' : averagePrice
     })
     print("Saving data to file")
-    with open('../data.json', 'w') as file:
+    with open('data_collector/price.json', 'w') as file:
         json.dump(data, file, sort_keys=True, indent=4)
 
 

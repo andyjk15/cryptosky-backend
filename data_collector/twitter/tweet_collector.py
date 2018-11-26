@@ -8,7 +8,7 @@ import emoji as ji
  
 from dotenv import load_dotenv
 from pathlib import Path  # python3 only
-env_path = Path('.') / 'config/twitter.env'
+env_path = Path('.') / 'data_collector/twitter/config/twitter.env'
 load_dotenv(dotenv_path=env_path)
 
 class keys():
@@ -105,8 +105,9 @@ class Listener(StreamListener):
  
 if __name__ == '__main__':
  
-    hashtag = ["Bitcoin", "bitcoin"]
-    tweets_file = "tweets.json"
+    hashtag = keys().currency_hashtags
+    hashtag = hashtag.split(', ')
+    tweets_file = "data_collector/tweets.json"
     tweet_data = []
 
     twitter_streamer = Streamer()
