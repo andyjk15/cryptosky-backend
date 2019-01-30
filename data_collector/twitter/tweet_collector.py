@@ -6,6 +6,9 @@ from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
 import random
 
+# Interface connetions
+import zerorpc
+
 # Provides list of unicode emojis for extraction
 import emoji as ji
  
@@ -68,7 +71,6 @@ class utilityFuncs():
             return True
         else:
             return False
-            
 
 class spamFiltering():
     """
@@ -204,4 +206,8 @@ if __name__ == '__main__':
 
     twitter_streamer = Streamer()
     #spamFiltering(training_set)
-    twitter_streamer.stream_tweets(tweets_file, training_set, hashtag)
+    addr = 'tcp://127.0.0.1:8686'
+    server = zerorpc.Server(twitter_streamer.stream_tweets(tweets_file, training_set, hashtag))
+    server.bind(addr)
+    print("Process running on {}".format(addr))
+    server.run()
