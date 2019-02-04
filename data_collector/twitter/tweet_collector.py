@@ -7,7 +7,7 @@ from nltk.corpus import stopwords
 import random
 
 # Interface connetions
-import zerorpc
+#import zerorpc
 
 # Provides list of unicode emojis for extraction
 import emoji as ji
@@ -66,37 +66,39 @@ class utilityFuncs():
         ##print(ratios)
         highest_ratio = max(ratios, key=ratios.get)
 
-        print(highest_ratio)
+        print("Console: Text is - ", highest_ratio)
+        sys.stdout.flush()
+
         if highest_ratio == 'english':
             return True
         else:
             return False
 
-class spamFiltering():
-    """
-    Spam filter using a naive bayes classifier 
-    TODO: Will need to generate a training dataset both spam and accepted messages
-    """
-    
-    def __init__(self, training_set):
-        self.training_set = training_set
-
-    def trainFilter(self):
-        dataset = spamFiltering().loadDataset(self.training_set)
-        #ham = loadDatasets('PATH')
-
-        all_text = [(text, 'text') for text in dataset]
-
-        # Randomise/shuffle dataset
-        random.shuffle(all_text)
-        
-    def loadDataset(self, path):
-        list = []
-        with open(path) as file:
-            tweet_data = json.load(file)
-            list.append()
-
-        return False
+#class spamFiltering():
+#    """
+#    Spam filter using a naive bayes classifier 
+#    TODO: Will need to generate a training dataset both spam and accepted messages
+#    """
+#    
+#    def __init__(self, training_set):
+#        self.training_set = training_set#
+#
+#    def trainFilter(self):
+#        dataset = spamFiltering().loadDataset(self.training_set)
+#        #ham = loadDatasets('PATH')
+#
+#        all_text = [(text, 'text') for text in dataset]
+#
+#        # Randomise/shuffle dataset
+#        random.shuffle(all_text)
+#        
+#    def loadDataset(self, path):
+#        list = []
+#        with open(path) as file:
+#            tweet_data = json.load(file)
+#            list.append()
+#
+#        return False
 
 
 class Streamer():
@@ -107,7 +109,13 @@ class Streamer():
     def stream_tweets(self, tweets_file, training_set, hashtag):
         listener = Listener(tweets_file, training_set)
         auth = OAuthHandler(keys().api_key, keys().api_secret)
+
+        print("Console: ", "Authorising with twitter API")
+        sys.stdout.flush()
+
         auth.set_access_token(keys().access_token, keys().access_secret)
+
+        print("Console: ", "Streaming Tweets")
         stream = Stream(auth, listener, tweet_mode='extended')
         stream.filter(languages=["en"], track=hashtag)
 
@@ -127,19 +135,23 @@ class Listener(StreamListener):
                 if 'extended_tweet' in data['retweeted_status']:
                     #if tweet is over the 140 word limit
                     text = data['retweeted_status']['extended_tweet']['full_text']
-                    print(text)
+                    print("Uncleaned Tweet", text)
+                    sys.stdout.flush()
                 else:
                     text = data['retweeted_status']['text']
-                    print(text)
+                    print("Uncleaned Tweet", text)
+                    sys.stdout.flush()
             else:
                 # Else if a normal Tweeet
                 if 'extended_tweet' in data:
                     # If tweet is over 140 word limit
                     text = data['extended_tweet']['full_text']
-                    print(text)
+                    print("Uncleaned Tweet", text)
+                    sys.stdout.flush()
                 else:
                     text = data['text']
-                    print(text)
+                    print("Uncleaned Tweet: ", text)
+                    sys.stdout.flush()
             
             tweet = utilityFuncs().cleanTweet(text)
             tweetText = utilityFuncs().removeSpacing(tweet[0])
@@ -150,7 +162,8 @@ class Listener(StreamListener):
 
                 tweetText = utilityFuncs().remove_non_ascii(tweetText)
 
-                print(tweetText)
+                print("Cleaned Tweet: ", tweetText)
+                sys.stdout.flush()
 
                 tweet = tweetText+' '+tweet[1]
 
@@ -184,30 +197,39 @@ class Listener(StreamListener):
                 #except BaseException as e:
                 #    print("Error: %s" % str(e))
             else:
-                print("Dropping tweet as it is not English")
+                print("Console: ", "Dropping tweet as it is not English")
+                sys.stdout.flush()
         except BaseException as e:
-                print("Error: %s" % str(e))
+                print("Console: ", "Error: %s" % str(e))
+                sys.stdout.flush()
         return True
           
     def on_error(self, status_code):
         if status_code == 420:
             return False
-        print(status_code)
+        print("Console: ", status_code)
+        sys.stdout.flush()
 
  
 if __name__ == '__main__':
  
-    print("tweet_collector.py")
+    print("Console: ", "==== tweet_collector.py ====")
+    sys.stdout.flush()
+
     hashtag = keys().currency_hashtags
     hashtag = hashtag.split(', ')
     tweets_file = "data_collector/tweets.json"
     training_set = "data_collector/training_set.txt"
     tweet_data = []
 
+    print("Console:", "Starting Twitter Streamer")
+    sys.stdout.flush()
+    
     twitter_streamer = Streamer()
+    twitter_streamer.stream_tweets(tweets_file, training_set, hashtag)
     #spamFiltering(training_set)
-    addr = 'tcp://127.0.0.1:8686'
-    server = zerorpc.Server(twitter_streamer.stream_tweets(tweets_file, training_set, hashtag))
-    server.bind(addr)
-    print("Process running on {}".format(addr))
-    server.run()
+    #addr = 'tcp://127.0.0.1:8686'
+    #server = zerorpc.Server(twitter_streamer.stream_tweets(tweets_file, training_set, hashtag))
+    #server.bind(addr)
+    #print("Process running on {}".format(addr))
+    #server.run()
