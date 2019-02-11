@@ -42,7 +42,7 @@ def bitfinex():
 def gemini():
     response = requests.request("GET", "https://api.gemini.com/v1/pubticker/btcusd")
     response = json.loads(response.text)
-    
+
     price = (float(response['last']) + float(response['ask']) + float(response['bid']))/3
     price = round(price, 3)
     return price
@@ -54,7 +54,7 @@ def collector():
 
     now = datetime.datetime.now()
 
-    print("Loading existing data")
+    print("Console: ", "Loading existing price data...")
     with open('data_collector/price.json') as file:
         data = json.load(file)
         data.append({
@@ -62,13 +62,14 @@ def collector():
         'Symbol' : 'BTC-USD',
         'Price' : averagePrice
     })
-    print("Saving data to file")
+
+    print("Console: ", "Saving data to file...")
     with open('data_collector/price.json', 'w') as file:
         json.dump(data, file, sort_keys=True, indent=4)
 
 
 if __name__=='__main__':
-    print('== Historical Price Collector ==')
+    print("Console: ", "== Historical Price Collector ==")
     while True:
         sleep(1)
         collector()
