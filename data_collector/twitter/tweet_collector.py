@@ -1,10 +1,17 @@
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
-import os, json, re, sys
+import os, json, re, sys, csv
+import pandas as pd
+import numpy as np
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
-import random
+import datetime
+now = datetime.datetime.now()
+
+from tqdm import tqdm
+
+import spam_filter
 
 # Interface connetions
 #import zerorpc
@@ -37,6 +44,9 @@ class utilityFuncs():
     
     def removeSpacing(self, text):
         return re.sub(r'( +)', ' ', text)
+
+    def fixLines(self, text):
+        return re.sub(r"(\w)([A-Z])", r"\1 \2", text)
 
     def remove_non_ascii(self, text):
         return ''.join(i for i in text if ord(i)<128)
@@ -100,7 +110,6 @@ class utilityFuncs():
 #
 #        return False
 
-
 class Streamer():
 
     def __init__(self):
@@ -135,55 +144,52 @@ class Listener(StreamListener):
                 if 'extended_tweet' in data['retweeted_status']:
                     #if tweet is over the 140 word limit
                     text = data['retweeted_status']['extended_tweet']['full_text']
-                    print("Uncleaned Tweet", text)
+                    print("Uncleaned Tweet:", text)
                     sys.stdout.flush()
                 else:
                     text = data['retweeted_status']['text']
-                    print("Uncleaned Tweet", text)
+                    print("Uncleaned Tweet:", text)
                     sys.stdout.flush()
             else:
                 # Else if a normal Tweeet
                 if 'extended_tweet' in data:
                     # If tweet is over 140 word limit
                     text = data['extended_tweet']['full_text']
-                    print("Uncleaned Tweet", text)
+                    print("Uncleaned Tweet:", text)
                     sys.stdout.flush()
                 else:
                     text = data['text']
                     print("Uncleaned Tweet: ", text)
                     sys.stdout.flush()
             
-            tweet = utilityFuncs().cleanTweet(text)
-            tweetText = utilityFuncs().removeSpacing(tweet[0])
+            #removedLines = utilityFuncs().fixLines(text)
+            removedSpecialChars = utilityFuncs().cleanTweet(text)
+            removedSpacing = utilityFuncs().removeSpacing(removedSpecialChars[0])
 
-            checkIfEnglish = utilityFuncs().detectLaguage(tweet[0])
+            #tweet = utilityFuncs().cleanTweet(text)
+            #tweetText = utilityFuncs().fixLines(tweet[0])
+            #tweetText = utilityFuncs().removeSpacing(tweetText)
+
+            checkIfEnglish = utilityFuncs().detectLaguage(removedSpecialChars[0])
 
             if checkIfEnglish == True:
 
-                tweetText = utilityFuncs().remove_non_ascii(tweetText)
+                tweetText = utilityFuncs().remove_non_ascii(removedSpacing)
 
                 print("Cleaned Tweet: ", tweetText)
                 sys.stdout.flush()
 
-                tweet = tweetText+' '+tweet[1]
+                cleanedTweet = tweetText+' '+removedSpecialChars[1]
 
                 try:
-                    with open(self.tweets_file) as file:
-                        tweet_data = json.load(file)
-                    tweet_data.append({
-                        'created_at'    : data['created_at'],
-                        'text'          : tweet,
-                        'reply_count'   : data['reply_count'],
-                        'retweet_count' : data['retweet_count'],
-                        'favorite_count': data['favorite_count']
-                    })
+                    with open(tweets_file, mode='a') as csv_file:
+                        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                        writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'tweet': cleanedTweet})
 
-                    with open(self.tweets_file, 'w') as file:
-                        json.dump(tweet_data, file, sort_keys=True, indent=4)
                     return True
                 except BaseException as exception:
                     print("Error: %s" % str(exception))
-                return True
+                return False
 
                 ## Create spam training set
                 #try:
@@ -218,9 +224,42 @@ if __name__ == '__main__':
 
     hashtag = keys().currency_hashtags
     hashtag = hashtag.split(', ')
-    tweets_file = "data_collector/tweets.json"
-    training_set = "data_collector/training_set.txt"
+    tweets_file = "data_collector/tweets.csv"
+    training_set = "data_collector/spam_ham.csv"
     tweet_data = []
+
+    print("Console:", "Initialising CSV...")
+
+    with open(tweets_file, mode='w') as csv_file:
+        fieldnames = ['created_at', 'tweet']
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
+        writer.writeheader()
+
+    #print("Console:", "Training Spam Filter...")
+    #data = pd.read_csv('data_collector/spam_ham.csv')
+    #data['class'] = data['classes'].map({'ham': 0, 'spam': 1})
+
+    #data.drop(['classes'], axis=1, inplace=True)
+    
+    #trainIndex, testIndex = list(), list()
+    #for i in tqdm(range(data.shape[0])):
+    #    if np.random.uniform(0, 1) < 0.75:
+    #        trainIndex += [i]
+    #    else:
+    #        testIndex += [i]
+    #trainData = data.loc[trainIndex]
+    #testData  = data.loc[testIndex]
+
+    #trainData.reset_index(inplace=True)
+    #testData.reset_index(inplace=True)
+    #trainData.drop(['index'], axis=1, inplace=True)
+    #testData.drop(['index'], axis=1, inplace=True)
+
+    #spamFilter = spam_filter.classifier(trainData)
+    #spamFilter.train()
+    #prediction = spamFilter.predict(testData['tweet'])
+
 
     print("Console:", "Starting Twitter Streamer")
     sys.stdout.flush()
