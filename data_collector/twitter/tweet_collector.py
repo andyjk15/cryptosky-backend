@@ -1,10 +1,17 @@
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
-import os, json, re, sys
+import os, json, re, sys, csv
+import pandas as pd
+import numpy as np
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
-import random
+import datetime
+now = datetime.datetime.now()
+
+from tqdm import tqdm
+
+import spam_filter
 
 # Interface connetions
 #import zerorpc
@@ -33,10 +40,14 @@ class utilityFuncs():
 
     def cleanTweet(self, text):
         # Function to clean tweets, removes links and special characters
-        return re.sub(r'([^0-9A-Za-z \t])|(@[A-Za-z0-9]+)|(http\S+)', '', text), ' '.join(c for c in text if c in ji.UNICODE_EMOJI)
+        return re.sub(r'([^0-9A-Za-z \-\%\£\$ \t])|(@[A-Za-z0-9]+)|(http\S+)', '', text), ' '.join(c for c in text if c in ji.UNICODE_EMOJI)
     
     def removeSpacing(self, text):
         return re.sub(r'( +)', ' ', text)
+
+    def fixLines(self, text):
+        return re.sub(r"([\r\n])", " ", text)
+        #return re.sub(r"(\w)([A-Z])", r"\1 \2", text)
 
     def remove_non_ascii(self, text):
         return ''.join(i for i in text if ord(i)<128)
@@ -74,6 +85,13 @@ class utilityFuncs():
         else:
             return False
 
+    def checkLength(self, text):
+        tokens = text.split()
+        if len(tokens) <= 5:
+            return False
+        else:
+            return True
+
 #class spamFiltering():
 #    """
 #    Spam filter using a naive bayes classifier 
@@ -99,7 +117,6 @@ class utilityFuncs():
 #            list.append()
 #
 #        return False
-
 
 class Streamer():
 
@@ -135,55 +152,53 @@ class Listener(StreamListener):
                 if 'extended_tweet' in data['retweeted_status']:
                     #if tweet is over the 140 word limit
                     text = data['retweeted_status']['extended_tweet']['full_text']
-                    print("Uncleaned Tweet", text)
+                    print("Uncleaned Tweet:", text)
                     sys.stdout.flush()
                 else:
                     text = data['retweeted_status']['text']
-                    print("Uncleaned Tweet", text)
+                    print("Uncleaned Tweet:", text)
                     sys.stdout.flush()
             else:
                 # Else if a normal Tweeet
                 if 'extended_tweet' in data:
                     # If tweet is over 140 word limit
                     text = data['extended_tweet']['full_text']
-                    print("Uncleaned Tweet", text)
+                    print("Uncleaned Tweet:", text)
                     sys.stdout.flush()
                 else:
                     text = data['text']
                     print("Uncleaned Tweet: ", text)
                     sys.stdout.flush()
             
-            tweet = utilityFuncs().cleanTweet(text)
-            tweetText = utilityFuncs().removeSpacing(tweet[0])
+            removedLines = utilityFuncs().fixLines(text)
+            removedSpecialChars = utilityFuncs().cleanTweet(removedLines)
+            removedSpacing = utilityFuncs().removeSpacing(removedSpecialChars[0])
 
-            checkIfEnglish = utilityFuncs().detectLaguage(tweet[0])
+            tweetLength = utilityFuncs().checkLength(removedSpacing)
 
-            if checkIfEnglish == True:
+            if tweetLength == True:
 
-                tweetText = utilityFuncs().remove_non_ascii(tweetText)
+                checkIfEnglish = utilityFuncs().detectLaguage(removedSpecialChars[0])
 
-                print("Cleaned Tweet: ", tweetText)
-                sys.stdout.flush()
+                if checkIfEnglish == True:
 
-                tweet = tweetText+' '+tweet[1]
+                    tweetText = utilityFuncs().remove_non_ascii(removedSpacing)
 
-                try:
-                    with open(self.tweets_file) as file:
-                        tweet_data = json.load(file)
-                    tweet_data.append({
-                        'created_at'    : data['created_at'],
-                        'text'          : tweet,
-                        'reply_count'   : data['reply_count'],
-                        'retweet_count' : data['retweet_count'],
-                        'favorite_count': data['favorite_count']
-                    })
+                    print("Cleaned Tweet: ", tweetText)
+                    sys.stdout.flush()
 
-                    with open(self.tweets_file, 'w') as file:
-                        json.dump(tweet_data, file, sort_keys=True, indent=4)
-                    return True
-                except BaseException as exception:
-                    print("Error: %s" % str(exception))
-                return True
+                    cleanedTweet = tweetText+' '+removedSpecialChars[1]
+
+                    try:
+                        with open(tweets_file, mode='a') as csv_file:
+                            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                            writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'tweet': cleanedTweet})
+
+                        return True
+                    except BaseException as exception:
+                        print("Error: %s" % str(exception))
+                        sys.stdout.flush()
+                    return False
 
                 ## Create spam training set
                 #try:
@@ -196,8 +211,11 @@ class Listener(StreamListener):
                 #        file.write(list)
                 #except BaseException as e:
                 #    print("Error: %s" % str(e))
+                else:
+                    print("Console: ", "Dropping tweet as it is not English")
+                    sys.stdout.flush()
             else:
-                print("Console: ", "Dropping tweet as it is not English")
+                print("Console: ", "Tweet too short for analysis")
                 sys.stdout.flush()
         except BaseException as e:
                 print("Console: ", "Error: %s" % str(e))
@@ -218,16 +236,63 @@ if __name__ == '__main__':
 
     hashtag = keys().currency_hashtags
     hashtag = hashtag.split(', ')
-    tweets_file = "data_collector/tweets.json"
-    training_set = "data_collector/training_set.txt"
+    tweets_file = "data_collector/tweets.csv"
+    training_set = "data_collector/500_spam_ham.csv"
     tweet_data = []
+
+    print("Console:", "Initialising CSV...")
+    sys.stdout.flush()
+
+    with open(tweets_file, mode='w') as csv_file:
+        fieldnames = ['created_at', 'tweet']
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+
+        writer.writeheader()
+
+    print("Console:", "Training Spam Filter...")
+    data = pd.read_csv(training_set)
+
+    data['class'] = data['classes'].map({'ham': 0, 'spam': 1})
+
+    data.drop(['classes'], axis=1, inplace=True)
+    
+    trainIndex, testIndex = list(), list()
+    for i in tqdm(range(data.shape[0])):
+        if np.random.uniform(0, 1) < 0.75:
+            trainIndex += [i]
+        else:
+            testIndex += [i]
+    trainData = data.loc[trainIndex]
+    testData  = data.loc[testIndex]
+
+    trainData.reset_index(inplace=True)
+    testData.reset_index(inplace=True)
+    trainData.drop(['index'], axis=1, inplace=True)
+    testData.drop(['index'], axis=1, inplace=True)
+
+    print("TRAIN DATA", trainData)
+    print("TEST DATA: ", testData['tweet'])
+
+    spamFilter = spam_filter.classifier(trainData)
+    spamFilter.train()
+    prediction = spamFilter.predict(testData['tweet'])
+
+    print("PREDICTION: ", prediction)
+
+    boop = spamFilter.predict("Bitcoin SV toughens up its cryptocurrency")
+
+    print("BOOP: ", boop)
 
     print("Console:", "Starting Twitter Streamer")
     sys.stdout.flush()
     
-    twitter_streamer = Streamer()
-    twitter_streamer.stream_tweets(tweets_file, training_set, hashtag)
+    #twitter_streamer = Streamer()
+    #twitter_streamer.stream_tweets(tweets_file, hashtag)
+    
+    
     #spamFiltering(training_set)
+    
+    
     #addr = 'tcp://127.0.0.1:8686'
     #server = zerorpc.Server(twitter_streamer.stream_tweets(tweets_file, training_set, hashtag))
     #server.bind(addr)
