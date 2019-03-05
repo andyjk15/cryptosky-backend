@@ -49,6 +49,7 @@ class utilityFuncs():
         return re.sub(r"([\r\n])", " ", text)
         #return re.sub(r"(\w)([A-Z])", r"\1 \2", text)
 
+
     def remove_non_ascii(self, text):
         return ''.join(i for i in text if ord(i)<128)
     
@@ -169,16 +170,18 @@ class Listener(StreamListener):
                     text = data['text']
                     print("Uncleaned Tweet: ", text)
                     sys.stdout.flush()
-            
+
             removedLines = utilityFuncs().fixLines(text)
             removedSpecialChars = utilityFuncs().cleanTweet(removedLines)
             removedSpacing = utilityFuncs().removeSpacing(removedSpecialChars[0])
 
             tweetLength = utilityFuncs().checkLength(removedSpacing)
 
+
             if tweetLength == True:
 
                 checkIfEnglish = utilityFuncs().detectLaguage(removedSpecialChars[0])
+
 
                 if checkIfEnglish == True:
 
@@ -242,6 +245,7 @@ if __name__ == '__main__':
 
     print("Console:", "Initialising CSV...")
     sys.stdout.flush()
+
 
     with open(tweets_file, mode='w') as csv_file:
         fieldnames = ['created_at', 'tweet']
