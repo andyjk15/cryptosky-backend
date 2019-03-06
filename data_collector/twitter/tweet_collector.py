@@ -75,7 +75,6 @@ class utilityFuncs():
 
         ratios = language_ratios
 
-        ##print(ratios)
         highest_ratio = max(ratios, key=ratios.get)
 
         print("Console: Text is - ", highest_ratio)
@@ -93,39 +92,13 @@ class utilityFuncs():
         else:
             return True
 
-#class spamFiltering():
-#    """
-#    Spam filter using a naive bayes classifier 
-#    TODO: Will need to generate a training dataset both spam and accepted messages
-#    """
-#    
-#    def __init__(self, training_set):
-#        self.training_set = training_set#
-#
-#    def trainFilter(self):
-#        dataset = spamFiltering().loadDataset(self.training_set)
-#        #ham = loadDatasets('PATH')
-#
-#        all_text = [(text, 'text') for text in dataset]
-#
-#        # Randomise/shuffle dataset
-#        random.shuffle(all_text)
-#        
-#    def loadDataset(self, path):
-#        list = []
-#        with open(path) as file:
-#            tweet_data = json.load(file)
-#            list.append()
-#
-#        return False
-
 class Streamer():
 
     def __init__(self):
         pass
 
-    def stream_tweets(self, tweets_file, training_set, hashtag):
-        listener = Listener(tweets_file, training_set)
+    def stream_tweets(self, tweets_file, hashtag):
+        listener = Listener(tweets_file)
         auth = OAuthHandler(keys().api_key, keys().api_secret)
 
         print("Console: ", "Authorising with twitter API")
@@ -139,9 +112,8 @@ class Streamer():
 
 class Listener(StreamListener):
     
-    def __init__(self, tweets_file, training_set):
+    def __init__(self, tweets_file):
         self.tweets_file = tweets_file
-        self.training_set = training_set
     
     def on_data(self, data):
 
@@ -192,6 +164,9 @@ class Listener(StreamListener):
 
                     cleanedTweet = tweetText+' '+removedSpecialChars[1]
 
+                    ## Check with spam filter
+
+
                     try:
                         with open(tweets_file, mode='a') as csv_file:
                             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
@@ -202,18 +177,6 @@ class Listener(StreamListener):
                         print("Error: %s" % str(exception))
                         sys.stdout.flush()
                     return False
-
-                ## Create spam training set
-                #try:
-                #    list = []
-                #    with open(self.training_set) as file:
-                #        for line in file:
-                #            list.append(line)
-                #    list.append(tweet)
-                #    with open(self.training_set, 'w') as file:
-                #        file.write(list)
-                #except BaseException as e:
-                #    print("Error: %s" % str(e))
                 else:
                     print("Console: ", "Dropping tweet as it is not English")
                     sys.stdout.flush()
@@ -231,7 +194,63 @@ class Listener(StreamListener):
         print("Console: ", status_code)
         sys.stdout.flush()
 
+class filterSpam(object):
+    def __init__(self, training_set):
+        self.training_set = training_set
+
+    def trainFilter(self):
+        self.dataset()
+        self.train()
+
+    def dataset(self):
+        self.data = pd.read_csv(self.training_set)
+
+        self.data['class'] = self.data['classes'].map({'ham': 0, 'spam': 1})
+
+        self.data.drop(['classes'], axis=1, inplace=True)
+    
+        self.trainIndex, self.testIndex = list(), list()
+        for i in range(self.data.shape[0]):
+            if np.random.uniform(0, 1) < 0.75:
+                self.trainIndex += [i]
+            else:
+                self.testIndex += [i]
+        self.trainData = self.data.loc[self.trainIndex]
+        self.testData  = self.data.loc[self.testIndex]
+
+        self.trainData.reset_index(inplace=True)
+        self.testData.reset_index(inplace=True)
+        self.trainData.drop(['index'], axis=1, inplace=True)
+        self.testData.drop(['index'], axis=1, inplace=True)
+
+        #print("TRAIN DATA", self.trainData)
+        #print("TEST DATA: ", self.testData['tweet'])
+
+    def train(self):
+        self.spamFilter = spam_filter.classifier(self.trainData)
+        self.spamFilter.train()
+        
+    def testData_Prediction(self):
+        prediction = self.spamFilter.predict(self.testData['tweet'])
+
+        return prediction
+
+    def testPrediction(self):
+
+        # Test Spam/Ham tweets - should return True and False respectivly
+        spam = spam_filter.processTweet("Earn more than 0015 btc free No deposit No investment Free Bitcoins - Earn $65 free btc in 5 minutes bitcoin freebtc getbtc") 
+        ham = spam_filter.processTweet("Bitcoin closed with some gains in month of February")    
+
+        hamTweet = self.spamFilter.classify(ham)
+        spamTweet = self.spamFilter.classify(spam)
+
+        print("Console: ", "Spam Tweet -- ", spamTweet)
+        print("Console: ", "Ham Tweet -- ", hamTweet)
+
+    def filterStatistics(self, prediction):
+        spam_filter.metrics(self.testData['class'], prediction)
  
+
 if __name__ == '__main__':
  
     print("Console: ", "==== tweet_collector.py ====")
@@ -240,10 +259,10 @@ if __name__ == '__main__':
     hashtag = keys().currency_hashtags
     hashtag = hashtag.split(', ')
     tweets_file = "data_collector/tweets.csv"
-    training_set = "data_collector/500_spam_ham.csv"
+    training_set = "data_collector/spam_ham.csv"
     tweet_data = []
 
-    print("Console:", "Initialising CSV...")
+    print("Console: ", "Initialising CSV...")
     sys.stdout.flush()
 
 
@@ -253,49 +272,23 @@ if __name__ == '__main__':
 
         writer.writeheader()
 
-    print("Console:", "Training Spam Filter...")
-    data = pd.read_csv(training_set)
+    print("Console: ", "Training Spam Filter...")
+    tweetFilter = filterSpam(training_set)
+    tweetFilter.trainFilter()
 
-    data['class'] = data['classes'].map({'ham': 0, 'spam': 1})
+    prediction = tweetFilter.testData_Prediction()
+    #print("Console: ", "Prediction - ", prediction)
 
-    data.drop(['classes'], axis=1, inplace=True)
-    
-    trainIndex, testIndex = list(), list()
-    for i in tqdm(range(data.shape[0])):
-        if np.random.uniform(0, 1) < 0.75:
-            trainIndex += [i]
-        else:
-            testIndex += [i]
-    trainData = data.loc[trainIndex]
-    testData  = data.loc[testIndex]
+    tweetFilter.filterStatistics(prediction)
 
-    trainData.reset_index(inplace=True)
-    testData.reset_index(inplace=True)
-    trainData.drop(['index'], axis=1, inplace=True)
-    testData.drop(['index'], axis=1, inplace=True)
+    tweetFilter.testPrediction()
 
-    print("TRAIN DATA", trainData)
-    print("TEST DATA: ", testData['tweet'])
-
-    spamFilter = spam_filter.classifier(trainData)
-    spamFilter.train()
-    prediction = spamFilter.predict(testData['tweet'])
-
-    print("PREDICTION: ", prediction)
-
-    boop = spamFilter.predict("Bitcoin SV toughens up its cryptocurrency")
-
-    print("BOOP: ", boop)
-
-    print("Console:", "Starting Twitter Streamer")
+    print("Console: ", "Starting Twitter Streamer")
     sys.stdout.flush()
     
-    #twitter_streamer = Streamer()
-    #twitter_streamer.stream_tweets(tweets_file, hashtag)
-    
-    
-    #spamFiltering(training_set)
-    
+    twitter_streamer = Streamer()
+    twitter_streamer.stream_tweets(tweets_file, hashtag)
+        
     
     #addr = 'tcp://127.0.0.1:8686'
     #server = zerorpc.Server(twitter_streamer.stream_tweets(tweets_file, training_set, hashtag))

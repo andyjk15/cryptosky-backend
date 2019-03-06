@@ -43,8 +43,8 @@ if __name__ == '__main__':
         'bear'      : -1,
         'bullish'   : 2.5,
         'bearish'   : -2.5,
-        'up'        : 0.1,
-        'down'      : -0.1,
+        'up'        : 0.5,
+        'down'      : -0.5,
         'high'      : 2.0,
         'low'       : -2.0,
         'higher'    : 1.8,
@@ -89,6 +89,16 @@ if __name__ == '__main__':
         'upwards' : 0.7,
         'downwards' : -0.7,
         'invest' : 1.0,
+        'raging' : 2.8,
+        'rocketing' : 3.1,
+        'swing' : 0.3,
+        'swinging' : 0.2,
+        'stake' : 0.4,
+        'whale' : -1.2,
+        'whales' : -1.3,
+        'lull' : -1.1,
+        'moon' : 1.7,
+        'choppy' : -0.2,
         
     }
 

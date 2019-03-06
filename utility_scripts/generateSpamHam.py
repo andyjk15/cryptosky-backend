@@ -11,7 +11,7 @@ for i, row in tqdm(data.iterrows()):
 
 data.to_csv('data_collector/spam_ham_unclean.csv', sep='\t', encoding='utf-8', index=False)
 
-with open('data_collector/spam_ham_unclean.csv','r') as in_file, open('data_collector/spam_ham.csv','w') as out_file:
+with open('data_collector/spam_ham_unclean.csv','r') as in_file, open('data_collector/spam_ham_alt.csv','w') as out_file:
     seen = set() # set for fast O(1) amortized lookup
     for line in tqdm(in_file):
         if line in seen: continue # skip duplicate

@@ -126,7 +126,7 @@ class classifier(object):
 
     def classify(self, processed):
         pSpam, pHam = 0, 0
-        for word in tqdm(processed):                
+        for word in processed:                
             if word in self.probSpam:
                 pSpam += log(self.probSpam[word])
             else:
