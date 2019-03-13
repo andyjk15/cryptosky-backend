@@ -1,44 +1,19 @@
-#####################
-#
-#
-#
-#
-#
-#
-#
-#
-########################
-
 import os, sys
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
 from nltk.stem import PorterStemmer
 import matplotlib.pyplot as plt
-#from wordcloud import cloud ## To visualise world counts ## Remove later
 from math import log, sqrt
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
-#def visualiseSpam(data):
+## Test with scikit learn Naive Bayes version
+from sklearn.naive_bayes import MultinomialNB, BernoulliNB
+from sklearn.metrics import confusion_matrix
+## Test with XGBoost
+import xgboost as xgb
 
-#    spamWords = ' '.join(list(data[data['class'] == 1]['tweets']))
-#    spam_count = cloud(width = 512,height = 512).generate(spamWords)
-#    plt.figure(figsize = (10, 8), facecolor = 'k')
-#    plt.imshow(spam_count)
-#    plt.axis('off')
-#    plt.tight_layout(pad = 0)
-#    plt.show()
-
-#def visualiseHam(data):
-    
-#    hamWords = ' '.join(list(data[data['class'] == 1]['tweets']))
-#    ham_count = cloud(width = 512,height = 512).generate(hamWords)
-#    plt.figure(figsize = (10, 8), facecolor = 'k')
-#    plt.imshow(ham_count)
-#    plt.axis('off')
-#    plt.tight_layout(pad = 0)
-#    plt.show()
 
 ## Logic
 
@@ -69,8 +44,26 @@ class classifier(object):
         self.labels = trainData['class']
 
     def train(self):
+        #self.MNB()
+        #self.BNB()
+        #self.xgboost()
         self.TF_and_IDF()
         self.TF_IDF()
+
+    def MNB(self):
+        MNBClf = MultinomialNB()
+        MNBClf.fit(self.tweet, self.labels)
+
+        MNBResult = MNBClf.predict(self.tweet)
+
+        print(confusion_matrix(self.tweet, MNBResult))
+
+
+    def BNB(self):
+        pass
+
+    def xgboost(self):
+        pass
 
     def TF_and_IDF(self):
         noTweets = self.tweet.shape[0]

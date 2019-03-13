@@ -13,6 +13,8 @@ from tqdm import tqdm
 
 import spam_filter
 
+import analysis_engine.sentiment_analysis as sentiment_analysis
+
 # Interface connetions
 #import zerorpc
 
@@ -97,8 +99,8 @@ class Streamer():
     def __init__(self):
         pass
 
-    def stream_tweets(self, tweets_file, hashtag):
-        listener = Listener(tweets_file)
+    def stream_tweets(self, tweets_file, hashtag, tweetFilter, analyser):
+        listener = Listener(tweets_file, tweetFilter, analyser)
         auth = OAuthHandler(keys().api_key, keys().api_secret)
 
         print("Console: ", "Authorising with twitter API")
@@ -112,8 +114,10 @@ class Streamer():
 
 class Listener(StreamListener):
     
-    def __init__(self, tweets_file):
+    def __init__(self, tweets_file, tweetFilter, analyser):
         self.tweets_file = tweets_file
+        self.tweetFilter = tweetFilter
+        self.analyser = analyser
     
     def on_data(self, data):
 
@@ -165,18 +169,25 @@ class Listener(StreamListener):
                     cleanedTweet = tweetText+' '+removedSpecialChars[1]
 
                     ## Check with spam filter
+                    classification = self.tweetFilter.testTweet(cleanedTweet)
 
+                    if classification == False:
+                        ## Perform Sentiment Analysis
+                        ovSentiment, compound = self.analyser.get_vader_sentiment(cleanedTweet)
 
-                    try:
-                        with open(tweets_file, mode='a') as csv_file:
-                            writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                            writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'tweet': cleanedTweet})
+                        try:
+                            with open(tweets_file, mode='a') as csv_file:
+                                writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+                                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
 
-                        return True
-                    except BaseException as exception:
-                        print("Error: %s" % str(exception))
+                            return True
+                        except BaseException as exception:
+                            print("Error: %s" % str(exception))
+                            sys.stdout.flush()
+                        return False
+                    else:
+                        print("Console: ", "Tweet is spam. Not storing tweet in dataset")
                         sys.stdout.flush()
-                    return False
                 else:
                     print("Console: ", "Dropping tweet as it is not English")
                     sys.stdout.flush()
@@ -249,6 +260,14 @@ class filterSpam(object):
 
     def filterStatistics(self, prediction):
         spam_filter.metrics(self.testData['class'], prediction)
+
+    def testTweet(self, tweet):
+
+        processed = spam_filter.processTweet(tweet)
+
+        classified = self.spamFilter.classify(processed)
+
+        return classified
  
 
 if __name__ == '__main__':
@@ -267,7 +286,7 @@ if __name__ == '__main__':
 
 
     with open(tweets_file, mode='w') as csv_file:
-        fieldnames = ['created_at', 'tweet']
+        fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
 
         writer.writeheader()
@@ -281,13 +300,18 @@ if __name__ == '__main__':
 
     tweetFilter.filterStatistics(prediction)
 
-    tweetFilter.testPrediction()
+    tweetFilter.testPrediction()    ## Can be commented out
+
+    print("Console: ", "Initialising Analysis Engine...")
+    analyser = sentiment_analysis.get_sentiment()
+    print("Console: ", "Updating lexicon with new words and sentiment...")
+    analyser.set_newSentiment()
 
     print("Console: ", "Starting Twitter Streamer")
     sys.stdout.flush()
     
     twitter_streamer = Streamer()
-    twitter_streamer.stream_tweets(tweets_file, hashtag)
+    twitter_streamer.stream_tweets(tweets_file, hashtag, tweetFilter, analyser)
         
     
     #addr = 'tcp://127.0.0.1:8686'
