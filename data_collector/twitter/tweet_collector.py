@@ -7,9 +7,8 @@ import numpy as np
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
 import datetime
-now = datetime.datetime.now()
 
-from tqdm import tqdm
+#from tqdm import tqdm
 
 import spam_filter
 
@@ -109,6 +108,8 @@ class Streamer():
         auth.set_access_token(keys().access_token, keys().access_secret)
 
         print("Console: ", "Streaming Tweets")
+        sys.stdout.flush()
+
         stream = Stream(auth, listener, tweet_mode='extended')
         stream.filter(languages=["en"], track=hashtag)
 
@@ -118,8 +119,15 @@ class Listener(StreamListener):
         self.tweets_file = tweets_file
         self.tweetFilter = tweetFilter
         self.analyser = analyser
+
+        self.gg = 0
     
     def on_data(self, data):
+        self.gg = self.gg + 1
+        print("TWEET NUMBER: ", self.gg)    # DELETE
+
+
+        now = datetime.datetime.now()
 
         data = json.loads(data)
         
@@ -176,6 +184,7 @@ class Listener(StreamListener):
                         ovSentiment, compound = self.analyser.get_vader_sentiment(cleanedTweet)
 
                         try:
+                            
                             with open(tweets_file, mode='a') as csv_file:
                                 writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
                                 writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
@@ -184,7 +193,7 @@ class Listener(StreamListener):
                         except BaseException as exception:
                             print("Error: %s" % str(exception))
                             sys.stdout.flush()
-                        return False
+                            return False
                     else:
                         print("Console: ", "Tweet is spam. Not storing tweet in dataset")
                         sys.stdout.flush()
@@ -256,7 +265,9 @@ class filterSpam(object):
         spamTweet = self.spamFilter.classify(spam)
 
         print("Console: ", "Spam Tweet -- ", spamTweet)
+        sys.stdout.flush()
         print("Console: ", "Ham Tweet -- ", hamTweet)
+        sys.stdout.flush()
 
     def filterStatistics(self, prediction):
         spam_filter.metrics(self.testData['class'], prediction)
@@ -281,9 +292,8 @@ if __name__ == '__main__':
     training_set = "data_collector/spam_ham.csv"
     tweet_data = []
 
-    print("Console: ", "Initialising CSV...")
+    print("Console: ", "Initialising Tweet CSV...")
     sys.stdout.flush()
-
 
     with open(tweets_file, mode='w') as csv_file:
         fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
@@ -292,6 +302,8 @@ if __name__ == '__main__':
         writer.writeheader()
 
     print("Console: ", "Training Spam Filter...")
+    sys.stdout.flush()
+
     tweetFilter = filterSpam(training_set)
     tweetFilter.trainFilter()
 
@@ -303,8 +315,12 @@ if __name__ == '__main__':
     tweetFilter.testPrediction()    ## Can be commented out
 
     print("Console: ", "Initialising Analysis Engine...")
+    sys.stdout.flush()
+
     analyser = sentiment_analysis.get_sentiment()
     print("Console: ", "Updating lexicon with new words and sentiment...")
+    sys.stdout.flush()
+
     analyser.set_newSentiment()
 
     print("Console: ", "Starting Twitter Streamer")
