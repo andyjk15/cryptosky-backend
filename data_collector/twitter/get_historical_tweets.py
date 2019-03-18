@@ -61,12 +61,16 @@ def processTweet(results):
     analyser.set_newSentiment()
 
     for text in results:
-        tweet = text['text']
+        tweet = results['text']
 
-        removedLines = tweet_collector.utilityFuncs().fixLines(text)
+        now = datetime.datetime.now()
+
+        removedLines = tweet_collector.utilityFuncs().fixLines(tweet)
         removedSpecialChars = tweet_collector.utilityFuncs().cleanTweet(removedLines)
         removedSpacing = tweet_collector.utilityFuncs().removeSpacing(removedSpecialChars[0])
         tweetLength = tweet_collector.utilityFuncs().checkLength(removedSpacing)
+
+        print(removedSpecialChars[0])
 
         if tweetLength == True:
 
@@ -233,7 +237,7 @@ if __name__ == "__main__":
     #NEED TO FILL IN MISSING PRICE DATA UP TO THE 18/03!!!!!!! - NEED TO KEEP PRICE AND TWEET GATHERING RUNNING (CALL A PRICE EVERTIME THERES A TWEETS SO
     # AMOUNT IS CONSISTANT)
 
-    new_dates = pd.date_range(start='2019-02-28', end='2019-03-19', closed=None)
+    new_dates = pd.date_range(start='2019-02-28', end='2019-03-17', closed=None)
     dates = {}
 
     for i, line in enumerate(new_dates):
@@ -248,7 +252,9 @@ if __name__ == "__main__":
 
         writer.writeheader()
 
-    processTweet("adda ad")
+
+    #test = {"text" : "bitcoin next rally area for BITSTAMPBTCUSD by Larizadeh"}
+    #processTweet(test)
     #print(tweet)
-    #request(dates)
-    #alt_request(alt_dates, dates)
+    request(dates)
+    alt_request(alt_dates, dates)
