@@ -50,17 +50,19 @@ def gemini():
     price = round(price, 3)
     return price
 
-def collector(priceCSV):
+def collector(priceCSV, fieldnames):
 
     now = datetime.datetime.now()
 
     averagePrice = (coinbase() + bitfinex() + gemini())/3
     averagePrice = round(averagePrice, 3)
 
+    print("Price: ", averagePrice)
+
     try:
         with open(priceCSV, mode='a') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-            writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'price': averagePrice})
+            writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'price': averagePrice})
 
         return True
     except BaseException as exception:
@@ -72,7 +74,7 @@ def collector(priceCSV):
 if __name__=='__main__':
     print("Console: ", "== Historical Price Collector ==")
 
-    priceCSV = 'data_collector/prices.csv'
+    priceCSV = 'data_collector/live_prices.csv'
 
     print("Console: ", "Initialising Prices CSV...")
     sys.stdout.flush()
@@ -83,6 +85,6 @@ if __name__=='__main__':
         writer.writeheader()
 
     while True:
-        sleep(5)
-        collector(priceCSV)
+        sleep(3600)
+        collector(priceCSV, fieldnames)
         #print("Complete!")

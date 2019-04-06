@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
-import datetime
+import datetime, time
 
 #from tqdm import tqdm
 
@@ -98,8 +98,8 @@ class Streamer():
     def __init__(self):
         pass
 
-    def stream_tweets(self, tweets_file, hashtag, tweetFilter, analyser):
-        listener = Listener(tweets_file, tweetFilter, analyser)
+    def stream_tweets(self, tweets_file, temp_tweets, hashtag, tweetFilter, analyser):
+        listener = Listener(tweets_file, temp_tweets, tweetFilter, analyser)
         auth = OAuthHandler(keys().api_key, keys().api_secret)
 
         print("Console: ", "Authorising with twitter API")
@@ -115,18 +115,18 @@ class Streamer():
 
 class Listener(StreamListener):
     
-    def __init__(self, tweets_file, tweetFilter, analyser):
+    def __init__(self, tweets_file, temp_tweets, tweetFilter, analyser):
         self.tweets_file = tweets_file
+        self.temp_tweets = temp_tweets
         self.tweetFilter = tweetFilter
         self.analyser = analyser
+        self.stack = {}
+        self.it = 0
 
-        self.gg = 0
+        self.start = time.time()
     
     def on_data(self, data):
-        self.gg = self.gg + 1
-        print("TWEET NUMBER: ", self.gg)    # DELETE
-
-
+        
         now = datetime.datetime.now()
 
         data = json.loads(data)
@@ -183,17 +183,46 @@ class Listener(StreamListener):
                         ## Perform Sentiment Analysis
                         ovSentiment, compound = self.analyser.get_vader_sentiment(cleanedTweet)
 
-                        try:
-                            
-                            with open(tweets_file, mode='a') as csv_file:
-                                writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
-                                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
+                        if time.time() - self.start >= 3600:
+                            print("Hour Passed")
+                            hour_tweets = pd.read_csv(temp_tweets)
 
-                            return True
-                        except BaseException as exception:
-                            print("Error: %s" % str(exception))
-                            sys.stdout.flush()
-                            return False
+                            hour_tweets = hour_tweets.drop_duplicates()
+
+                            mean_compound = hour_tweets['compound'].mean()
+
+                            try:
+                                with open('data_collector/live_sentiment.csv', mode='a') as live:
+                                    writer = csv.DictWriter(live, fieldnames=live_fieldnames)
+                                    writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'sentiment': mean_compound})
+                            except BaseException as exception:
+                                print("1 Error: %s" % str(exception))
+                                sys.stdout.flush()
+
+                            with open(temp_tweets, mode='w') as csv_file:
+                                fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
+                                writer = csv.DictWriter(csv_file, fieldnames=temp_fieldnames)
+
+                                writer.writeheader()
+
+                            self.start = time.time()
+                        else:
+                            try:
+                                with open(temp_tweets, mode='a') as csv_file:
+                                    writer = csv.DictWriter(csv_file, fieldnames=temp_fieldnames)
+                                    writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M:%S"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
+                            except BaseException as exception:
+                                print("2 Error: %s" % str(exception))
+                                sys.stdout.flush()
+
+                            print("+++++++++++++++++")
+                            try:
+                                with open(tweets_file, mode='a') as csv_file:
+                                    writer = csv.DictWriter(csv_file, fieldnames=fieldnames_tweet)
+                                    writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M:%S"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
+                            except BaseException as exception:
+                                print("3 Error: %s" % str(exception))
+                                sys.stdout.flush()
                     else:
                         print("Console: ", "Tweet is spam. Not storing tweet in dataset")
                         sys.stdout.flush()
@@ -289,6 +318,7 @@ if __name__ == '__main__':
     hashtag = keys().currency_hashtags
     hashtag = hashtag.split(', ')
     tweets_file = "data_collector/tweets.csv"
+    temp_tweets = "data_collector/temp_tweets"
     training_set = "data_collector/spam_ham.csv"
     tweet_data = []
 
@@ -296,8 +326,20 @@ if __name__ == '__main__':
     sys.stdout.flush()
 
     with open(tweets_file, mode='w') as csv_file:
-        fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
-        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        fieldnames_tweet = ['created_at', 'tweet', 'sentiment', 'compound']
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames_tweet)
+
+        writer.writeheader()
+
+    with open(temp_tweets, mode='w') as csv_file:
+        temp_fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
+        writer = csv.DictWriter(csv_file, fieldnames=temp_fieldnames)
+
+        writer.writeheader()
+
+    with open('data_collector/live_sentiment.csv', mode='w') as csv_file:
+        live_fieldnames = ['created_at', 'sentiment']
+        writer = csv.DictWriter(csv_file, fieldnames=live_fieldnames)
 
         writer.writeheader()
 
@@ -327,7 +369,7 @@ if __name__ == '__main__':
     sys.stdout.flush()
     
     twitter_streamer = Streamer()
-    twitter_streamer.stream_tweets(tweets_file, hashtag, tweetFilter, analyser)
+    twitter_streamer.stream_tweets(tweets_file, temp_tweets, hashtag, tweetFilter, analyser)
         
     
     #addr = 'tcp://127.0.0.1:8686'

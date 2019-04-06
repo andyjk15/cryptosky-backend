@@ -34,6 +34,7 @@ if __name__ == "__main__":
     #print(data.isnull().values.any())
 
     data.price = data.price.fillna((data.price.shift(23) + data.price.shift(-24))/2)
+    data = data.round(3)
 
     #print("After NANS", data)
     #print(data[pd.isnull(data).any(axis=1)])
@@ -52,7 +53,7 @@ if __name__ == "__main__":
 
     data = new_prices.set_index('timestamp').resample('1D').mean().resample('1H').mean()
     data = data.fillna(method='backfill')
-    
+    data = data.round(3)
     print(data)
 
     with open(price_file, 'a') as file:
