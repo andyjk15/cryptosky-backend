@@ -8,8 +8,6 @@ from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
 import datetime, time
 
-#from tqdm import tqdm
-
 import spam_filter
 
 import analysis_engine.sentiment_analysis as sentiment_analysis
@@ -115,104 +113,82 @@ class Streamer():
 
 class Listener(StreamListener):
     
-    def __init__(self, tweets_file, temp_tweets, tweetFilter, analyser):
+    def __init__(self, tweets_file, temp_tweets, tweetFilter, analyser, time_limit=3000):
         self.tweets_file = tweets_file
         self.temp_tweets = temp_tweets
         self.tweetFilter = tweetFilter
         self.analyser = analyser
         self.stack = {}
-        self.it = 0
 
-        self.start = time.time()
+        self.start_time = time.time()
+        self.limit = time_limit
     
     def on_data(self, data):
         
-        now = datetime.datetime.now()
+        if (time.time() - self.start_time) < self.limit:
 
-        data = json.loads(data)
+            now = datetime.datetime.now()
+
+            data = json.loads(data) 
         
-        try:
-            # Check if tweet is a retweet
-            if 'retweeted_status' in data:
-                if 'extended_tweet' in data['retweeted_status']:
-                    #if tweet is over the 140 word limit
-                    text = data['retweeted_status']['extended_tweet']['full_text']
-                    print("Uncleaned Tweet:", text)
-                    sys.stdout.flush()
+            try:
+                # Check if tweet is a retweet
+                if 'retweeted_status' in data:
+                    if 'extended_tweet' in data['retweeted_status']:
+                        #if tweet is over the 140 word limit
+                        text = data['retweeted_status']['extended_tweet']['full_text']
+                        print("Uncleaned Tweet:", text)
+                        sys.stdout.flush()
+                    else:
+                        text = data['retweeted_status']['text']
+                        print("Uncleaned Tweet:", text)
+                        sys.stdout.flush()
                 else:
-                    text = data['retweeted_status']['text']
-                    print("Uncleaned Tweet:", text)
-                    sys.stdout.flush()
-            else:
-                # Else if a normal Tweeet
-                if 'extended_tweet' in data:
-                    # If tweet is over 140 word limit
-                    text = data['extended_tweet']['full_text']
-                    print("Uncleaned Tweet:", text)
-                    sys.stdout.flush()
-                else:
-                    text = data['text']
-                    print("Uncleaned Tweet: ", text)
-                    sys.stdout.flush()
+                    # Else if a normal Tweeet
+                    if 'extended_tweet' in data:
+                        # If tweet is over 140 word limit
+                        text = data['extended_tweet']['full_text']
+                        print("Uncleaned Tweet:", text)
+                        sys.stdout.flush()
+                    else:
+                        text = data['text']
+                        print("Uncleaned Tweet: ", text)
+                        sys.stdout.flush()
 
-            removedLines = utilityFuncs().fixLines(text)
-            removedSpecialChars = utilityFuncs().cleanTweet(removedLines)
-            removedSpacing = utilityFuncs().removeSpacing(removedSpecialChars[0])
+                removedLines = utilityFuncs().fixLines(text)
+                removedSpecialChars = utilityFuncs().cleanTweet(removedLines)
+                removedSpacing = utilityFuncs().removeSpacing(removedSpecialChars[0])
 
-            tweetLength = utilityFuncs().checkLength(removedSpacing)
+                tweetLength = utilityFuncs().checkLength(removedSpacing)
 
 
-            if tweetLength == True:
+                if tweetLength == True:
 
-                checkIfEnglish = utilityFuncs().detectLaguage(removedSpecialChars[0])
+                    checkIfEnglish = utilityFuncs().detectLaguage(removedSpecialChars[0])
 
 
-                if checkIfEnglish == True:
+                    if checkIfEnglish == True:
 
-                    tweetText = utilityFuncs().remove_non_ascii(removedSpacing)
+                        tweetText = utilityFuncs().remove_non_ascii(removedSpacing)
 
-                    print("Cleaned Tweet: ", tweetText)
-                    sys.stdout.flush()
+                        print("Cleaned Tweet: ", tweetText)
+                        sys.stdout.flush()
 
-                    cleanedTweet = tweetText+' '+removedSpecialChars[1]
+                        cleanedTweet = tweetText+' '+removedSpecialChars[1]
 
-                    ## Check with spam filter
-                    classification = self.tweetFilter.testTweet(cleanedTweet)
+                        ## Check with spam filter
+                        classification = self.tweetFilter.testTweet(cleanedTweet)
 
-                    if classification == False:
-                        ## Perform Sentiment Analysis
-                        ovSentiment, compound = self.analyser.get_vader_sentiment(cleanedTweet)
+                        if classification == False:
+                            ## Perform Sentiment Analysis
+                            ovSentiment, compound = self.analyser.get_vader_sentiment(cleanedTweet)
 
-                        if time.time() - self.start >= 3600:
-                            print("Hour Passed")
-                            hour_tweets = pd.read_csv(temp_tweets)
-
-                            hour_tweets = hour_tweets.drop_duplicates()
-
-                            mean_compound = hour_tweets['compound'].mean()
-
-                            try:
-                                with open('data_collector/live_sentiment.csv', mode='a') as live:
-                                    writer = csv.DictWriter(live, fieldnames=live_fieldnames)
-                                    writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'sentiment': mean_compound})
-                            except BaseException as exception:
-                                print("1 Error: %s" % str(exception))
-                                sys.stdout.flush()
-
-                            with open(temp_tweets, mode='w') as csv_file:
-                                fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
-                                writer = csv.DictWriter(csv_file, fieldnames=temp_fieldnames)
-
-                                writer.writeheader()
-
-                            self.start = time.time()
-                        else:
                             try:
                                 with open(temp_tweets, mode='a') as csv_file:
                                     writer = csv.DictWriter(csv_file, fieldnames=temp_fieldnames)
                                     writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M:%S"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
                             except BaseException as exception:
-                                print("2 Error: %s" % str(exception))
+                                print("1 Error: %s" % str(exception))
                                 sys.stdout.flush()
 
                             print("+++++++++++++++++")
@@ -221,21 +197,24 @@ class Listener(StreamListener):
                                     writer = csv.DictWriter(csv_file, fieldnames=fieldnames_tweet)
                                     writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:%M:%S"), 'tweet': cleanedTweet, 'sentiment': ovSentiment, 'compound': compound})
                             except BaseException as exception:
-                                print("3 Error: %s" % str(exception))
+                                print("2 Error: %s" % str(exception))
                                 sys.stdout.flush()
+                        else:
+                            print("Console: ", "Tweet is spam. Not storing tweet in dataset")
+                            sys.stdout.flush()
                     else:
-                        print("Console: ", "Tweet is spam. Not storing tweet in dataset")
+                        print("Console: ", "Dropping tweet as it is not English")
                         sys.stdout.flush()
                 else:
-                    print("Console: ", "Dropping tweet as it is not English")
+                    print("Console: ", "Tweet too short for analysis")
                     sys.stdout.flush()
-            else:
-                print("Console: ", "Tweet too short for analysis")
-                sys.stdout.flush()
-        except BaseException as e:
-                print("Console: ", "Error: %s" % str(e))
-                sys.stdout.flush()
-        return True
+            except BaseException as e:
+                    print("Console: ", "Error: %s" % str(e))
+                    sys.stdout.flush()
+            return True
+        else:
+            print("Console: ", "Ran for an hour. Closing stream..")
+            return False
           
     def on_error(self, status_code):
         if status_code == 420:
@@ -318,7 +297,7 @@ if __name__ == '__main__':
     hashtag = keys().currency_hashtags
     hashtag = hashtag.split(', ')
     tweets_file = "data_collector/tweets.csv"
-    temp_tweets = "data_collector/temp_tweets"
+    temp_tweets = "data_collector/temp_tweets.csv"
     training_set = "data_collector/spam_ham.csv"
     tweet_data = []
 
@@ -334,12 +313,6 @@ if __name__ == '__main__':
     with open(temp_tweets, mode='w') as csv_file:
         temp_fieldnames = ['created_at', 'tweet', 'sentiment', 'compound']
         writer = csv.DictWriter(csv_file, fieldnames=temp_fieldnames)
-
-        writer.writeheader()
-
-    with open('data_collector/live_sentiment.csv', mode='w') as csv_file:
-        live_fieldnames = ['created_at', 'sentiment']
-        writer = csv.DictWriter(csv_file, fieldnames=live_fieldnames)
 
         writer.writeheader()
 
