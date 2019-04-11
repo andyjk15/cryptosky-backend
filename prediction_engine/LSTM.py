@@ -29,10 +29,12 @@ class Network(object):
         train_X, train_Y = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size])
         test_X, test_Y = self.create_sets(self.price_test, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)])
 
+        #print(self.test_X)
+
         train_X = np.reshape(train_X, (train_X.shape[0], 1, train_X.shape[1]))
         test_X = np.reshape(test_X, (test_X.shape[0], 1, test_X.shape[1]))
 
-        self.model_network(train_X, test_X, train_Y, test_Y)
+        self.model_network(train_X, train_Y, test_X, test_Y)
 
     def preprocess(self):
         
@@ -43,7 +45,7 @@ class Network(object):
         self.sentiment_data = self.model_data['compound'].values.reshape(-1,1)
         self.price_data = self.model_data['price'].values.reshape(-1,1)
 
-        print(type(self.sentiment_data))
+        #print(type(self.sentiment_data))
         # Unfortunately, I'd advice you to test your solution to such issues as currently no consistency in data types are guaranteed. 
         # Usually - most of the transformers return data in a provided format so as long your base data is in float32 
         # - it will stay float32. But there are some edge cases like to_categorical.
@@ -75,7 +77,7 @@ class Network(object):
                 data_Y.append(data[i + lookback, 0])
         return np.array(data_X), np.array(data_Y)
 
-    def model_network(self, train_X, test_X, train_Y, test_Y):
+    def model_network(self, train_X, train_Y, test_X, test_Y):
         self.model = Sequential()
 
         ## 1st layer - input layer
@@ -97,7 +99,7 @@ class Network(object):
         self.model.add(Dense(1))
         self.model.compile(loss='mean_squared_error', optimizer='adam')
 
-        history = self.model.fit(train_X, train_Y, epochs=10, batch_size=100, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
+        history = self.model.fit(train_X, train_Y, epochs=500, batch_size=100, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
 
         yhat = self.model.predict(test_X)
 
@@ -113,22 +115,20 @@ class Network(object):
         rmse_sent = sqrt(mean_squared_error(testY_inverse_sent, yhat_inverse_sent))
         print('Test RMSE: %.3f' % rmse_sent)
         
-        #x = self.model_data.index
-        #plt.ion()
-        plt.plot(test_Y, label='true')
-        plt.plot(yhat, label='predict')
+        plt.figure(1)
+        plt.plot(testY_inverse_sent, label='true')
+        plt.plot(yhat_inverse_sent, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
-        #plt.xticks(x)    ## Data range
-        #plt.yticks()    ## Price range
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        #plt.ion()
-        #plt.show()
+        plt.savefig("True_Pred_Train.png")
+        plt.clf()
 
-        #btc_1_trace = go.Scatter(x=self.model_data.index.values[3605-1080-1:], y=yhat_inverse_sent.reshape(1080), name= 'predict_lookup')
-        #py.iplot([btc_1_trace])
+        self.test_Y_updating = testY_inverse_sent
+        self.yhat_updating = yhat_inverse_sent
+        
 
     def future_trading(self, live_price, live_sentiment):
         price_file = pd.read_csv('data_collector/historical_prices.csv')
@@ -187,11 +187,10 @@ class Network(object):
         price_tail = pd.concat([last_4_price, price_tail], axis=0)
         sentiment_tail = pd.concat([last_4_sent, sentiment_tail], axis=0)
 
-        #print(price_tail)
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['sentiment'].values.reshape(-1,1)
+        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
@@ -201,18 +200,15 @@ class Network(object):
 
         yhat = self.model.predict(testX)
         yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
+        testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
 
+        rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
+        print('Test RMSE: %.3f' % rmse_sent)
+        
         true.put(price)
         prediction.put(yhat_inverse[0])
 
-        #print("YHAT", yhat_inverse[0][0])
-        #print("previous_val", self.previous_val.astype(np.float32))
-
         current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
-        
-        #print("Current_val", current_val)
-
-        #exit()
 
         if current_val >= self.threshold:
             print("Buy")
@@ -221,9 +217,36 @@ class Network(object):
         else:
             print("Prediction Error!")
 
+        print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        ## POSSIBLY SAVE AND OR PLOT???
-        self.previous_val = yhat_inverse[0][0]
+        plt.figure(2)
+        plt.plot(testY_inverse, label='true')
+        plt.plot(yhat_inverse, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train_1.png")
+
+        ## Updating plot
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+
+        plt.figure(1)
+        plt.plot(self.test_Y_updating, label='true')
+        plt.plot(self.yhat_updating, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train.png")
+        plt.clf()
+        
+        self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
+
+        ### Create plot with and without sentiment modeled!!!
 
     def remodel2(self, price_file, previous_sent, live_price, live_sentiment):
 
@@ -249,7 +272,7 @@ class Network(object):
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['sentiment'].values.reshape(-1,1)
+        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
@@ -259,6 +282,10 @@ class Network(object):
 
         yhat = self.model.predict(testX)
         yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
+        testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
+
+        rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
+        print('Test RMSE: %.3f' % rmse_sent)
 
         true.put(price)
         prediction.put(yhat_inverse[0])
@@ -272,9 +299,34 @@ class Network(object):
         else:
             print("Prediction Error!")
         
+        print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        ## POSSIBLY SAVE AND OR PLOT???
         self.previous_val = yhat_inverse[0][0]
+
+        plt.figure(3)
+        plt.plot(testY_inverse, label='true')
+        plt.plot(yhat_inverse, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train_2.png")
+
+        ## Updating plot
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+
+        plt.figure(1)
+        plt.plot(self.test_Y_updating, label='true')
+        plt.plot(self.yhat_updating, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train.png")
+        plt.clf()
 
     def remodel3(self, price_file, previous_sent, live_price, live_sentiment):
 
@@ -300,7 +352,7 @@ class Network(object):
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['sentiment'].values.reshape(-1,1)
+        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
@@ -310,6 +362,10 @@ class Network(object):
 
         yhat = self.model.predict(testX)
         yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
+        testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
+
+        rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
+        print('Test RMSE: %.3f' % rmse_sent)
 
         true.put(price)
         prediction.put(yhat_inverse[0])
@@ -323,9 +379,34 @@ class Network(object):
         else:
             print("Prediction Error!")
         
+        print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        ## POSSIBLY SAVE AND OR PLOT???
         self.previous_val = yhat_inverse[0][0]
+
+        plt.figure(4)
+        plt.plot(testY_inverse, label='true')
+        plt.plot(yhat_inverse, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train_3.png")
+
+        ## Updating plot
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+
+        plt.figure(1)
+        plt.plot(self.test_Y_updating, label='true')
+        plt.plot(self.yhat_updating, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train.png")
+        plt.clf()
 
     def remodel4(self, price_file, previous_sent, live_price, live_sentiment):
 
@@ -351,7 +432,7 @@ class Network(object):
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['sentiment'].values.reshape(-1,1)
+        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
@@ -361,6 +442,10 @@ class Network(object):
 
         yhat = self.model.predict(testX)
         yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
+        testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
+
+        rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
+        print('Test RMSE: %.3f' % rmse_sent)
 
         true.put(price)
         prediction.put(yhat_inverse[0])
@@ -374,16 +459,41 @@ class Network(object):
         else:
             print("Prediction Error!")
         
+        print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        ## POSSIBLY SAVE AND OR PLOT???
         self.previous_val = yhat_inverse[0][0]
+
+        plt.figure(5)
+        plt.plot(testY_inverse, label='true')
+        plt.plot(yhat_inverse, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train_4.png")
+
+        ## Updating plot
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+
+        plt.figure(1)
+        plt.plot(self.test_Y_updating, label='true')
+        plt.plot(self.yhat_updating, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train.png")
+        plt.clf()
 
     def remodel(self, price_file, previous_sent, live_price, live_sentiment):
         price = pd.read_csv(live_price)
         sentiment = pd.read_csv(live_sentiment)
 
-        price_tail = price.tail(5)
-        sentiment_tail = sentiment.tail(5)
+        price_tail = price#.tail(5)
+        sentiment_tail = sentiment#.tail(5)
 
         price_tail.index = price_tail['created_at']
         sentiment_tail.index = sentiment_tail['created_at']
@@ -391,7 +501,7 @@ class Network(object):
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['sentiment'].values.reshape(-1,1)
+        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
@@ -401,11 +511,23 @@ class Network(object):
 
         yhat = self.model.predict(testX)
         yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
+        testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
+
+        rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
+        print('Test RMSE: %.3f' % rmse_sent)
 
         true.put(price)
         prediction.put(yhat_inverse[0])
 
         current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
+
+
+        if not hasattr(Network, 'testY_cont'):
+            self.testY_cont = pd.concat([self.testY_cont, testY_inverse], axis=0)
+            self.yhat_cont = pd.concat([self.yhat_cont, yhat_inverse], axis=0)
+        else:
+            self.testY_cont = testY_inverse
+            self.yhat_cont = yhat_inverse
 
         if current_val >= self.threshold:
             print("Buy")
@@ -414,9 +536,35 @@ class Network(object):
         else:
             print("Prediction Error!")
 
+        print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        ## POSSIBLY SAVE AND OR PLOT???
-        self.previous_val = yhat_inverse[0][0]
+        self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
+
+        plt.figure(6)
+        plt.plot(self.testY_cont, label='true')
+        plt.plot(self.yhat_cont, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train_updating.png")
+        plt.clf()
+
+        ## Updating plot
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+
+        plt.figure(1)
+        plt.plot(self.test_Y_updating, label='true')
+        plt.plot(self.yhat_updating, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_Train.png")
+        plt.clf()
 
 
 if __name__ == "__main__":
@@ -429,10 +577,10 @@ if __name__ == "__main__":
     live_sentiment = "data_collector/live_sentiment.csv"
 
 
-    print("price length", len(price_file))
+    #print("price length", len(price_file))
     price_file.columns = ["created_at","price"]
 
-    print("sent length", len(tweet_file))
+    #print("sent length", len(tweet_file))
     tweet_file.columns = ["created_at","tweet","sentiment","compound"]
     
     merged = pd.merge(left=price_file, right=tweet_file, how="inner")
