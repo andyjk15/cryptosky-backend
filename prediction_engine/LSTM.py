@@ -99,7 +99,7 @@ class Network(object):
         self.model.add(Dense(1))
         self.model.compile(loss='mean_squared_error', optimizer='adam')
 
-        history = self.model.fit(train_X, train_Y, epochs=500, batch_size=100, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
+        history = self.model.fit(train_X, train_Y, epochs=200, batch_size=100, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
 
         yhat = self.model.predict(test_X)
 
@@ -124,7 +124,7 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train.png")
-        plt.clf()
+        plt.close()
 
         self.test_Y_updating = testY_inverse_sent
         self.yhat_updating = yhat_inverse_sent
@@ -242,7 +242,7 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train.png")
-        plt.clf()
+        plt.close()
         
         self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
@@ -326,7 +326,11 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train.png")
-        plt.clf()
+        plt.close()
+
+        #Print current Trues and Predictions
+        print("Current Trues: ", list(true.queue))
+        print("Current Predictions: ", list(prediction.queue))
 
     def remodel3(self, price_file, previous_sent, live_price, live_sentiment):
 
@@ -406,7 +410,11 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train.png")
-        plt.clf()
+        plt.close()
+
+        #Print current Trues and Predictions
+        print("Current Trues: ", list(true.queue))
+        print("Current Predictions: ", list(prediction.queue))
 
     def remodel4(self, price_file, previous_sent, live_price, live_sentiment):
 
@@ -486,14 +494,18 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train.png")
-        plt.clf()
+        plt.close()
+
+        #Print current Trues and Predictions
+        print("Current Trues: ", list(true.queue))
+        print("Current Predictions: ", list(prediction.queue))
 
     def remodel(self, price_file, previous_sent, live_price, live_sentiment):
         price = pd.read_csv(live_price)
         sentiment = pd.read_csv(live_sentiment)
 
-        price_tail = price#.tail(5)
-        sentiment_tail = sentiment#.tail(5)
+        price_tail = price.tail(5)
+        sentiment_tail = sentiment.tail(5)
 
         price_tail.index = price_tail['created_at']
         sentiment_tail.index = sentiment_tail['created_at']
@@ -549,7 +561,7 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train_updating.png")
-        plt.clf()
+        plt.close()
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
@@ -564,7 +576,11 @@ class Network(object):
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train.png")
-        plt.clf()
+        plt.close()
+
+        #Print current Trues and Predictions
+        print("Current Trues: ", list(true.queue))
+        print("Current Predictions: ", list(prediction.queue))
 
 
 if __name__ == "__main__":
@@ -576,11 +592,8 @@ if __name__ == "__main__":
     live_price = "data_collector/live_prices.csv"
     live_sentiment = "data_collector/live_sentiment.csv"
 
-
-    #print("price length", len(price_file))
     price_file.columns = ["created_at","price"]
 
-    #print("sent length", len(tweet_file))
     tweet_file.columns = ["created_at","tweet","sentiment","compound"]
     
     merged = pd.merge(left=price_file, right=tweet_file, how="inner")
@@ -591,4 +604,3 @@ if __name__ == "__main__":
     network.data()
 
     network.future_trading(live_price, live_sentiment)
-    #preprocess(tweet_file, price_file)
