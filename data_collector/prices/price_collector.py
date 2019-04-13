@@ -24,37 +24,70 @@ def coinbase():
     api_key = keys().api_key
     api_secret = keys().api_secret
 
-    client = Client(api_key, api_secret)
-    repsonse = client.get_spot_price(currency_pair = 'BTC-USD')
-
-    price = (float(repsonse['amount']))
-    price = round(price, 3)
-
-    return price
+    try:
+        client = Client(api_key, api_secret)
+        repsonse = client.get_spot_price(currency_pair = 'BTC-USD')
+        price = (float(repsonse['amount']))
+        price = round(price, 3)
+        return price
+    except KeyError as e:
+        print("Error: %s" % str(e))
+        sys.stdout.flush()
+        price = 0
+        return price
 
 def bitfinex():
-    response = requests.request("GET", "https://api.bitfinex.com/v1/pubticker/btcusd")
-    response = json.loads(response.text)
 
-    #print(response)
+    try:
+        response = requests.request("GET", "https://api.bitfinex.com/v1/pubticker/btcusd")
+        response = json.loads(response.text)
 
-    price = (float(response['low'])+ float(response['mid']) + float(response['high']))/3
-    price = round(price, 3)
-    return price
-
+        price = (float(response['low'])+ float(response['mid']) + float(response['high']))/3
+        price = round(price, 3)
+        return price
+    except KeyError as e:
+        print("Error: %s" % str(e))
+        sys.stdout.flush()
+        price = 0
+        return price
+    
 def gemini():
-    response = requests.request("GET", "https://api.gemini.com/v1/pubticker/btcusd")
-    response = json.loads(response.text)
 
-    price = (float(response['last']) + float(response['ask']) + float(response['bid']))/3
-    price = round(price, 3)
-    return price
+    try:
+        response = requests.request("GET", "https://api.gemini.com/v1/pubticker/btcusd")
+        response = json.loads(response.text)
+
+        price = (float(response['last']) + float(response['ask']) + float(response['bid']))/3
+        price = round(price, 3)
+        return price
+    except KeyError as e:
+        print("Error: %s" % str(e))
+        sys.stdout.flush()
+        price = 0
+        return price
 
 def collector(priceCSV, fieldnames):
 
     now = datetime.datetime.now()
 
-    averagePrice = (coinbase() + bitfinex() + gemini())/3
+    coinbase_P = coinbase()
+    bitfinex_P = bitfinex()
+    gemini_P = gemini()
+
+    if coinbase_P == 0 or bitfinex_P == 0 or gemini_P == 0:
+        if coinbase_P and bitfinex_P == 0:
+            averagePrice = gemini_P
+            return
+        elif coinbase_P and gemini_P == 0:
+            averagePrice = bitfinex_P
+            return
+        elif bitfinex_P and gemini_P == 0:
+            averagePrice = coinbase_P
+            return
+        averagePrice = (coinbase_P + bitfinex_P + gemini_P)/2
+    else:
+        averagePrice = (coinbase_P + bitfinex_P + gemini_P)/3
+
     averagePrice = round(averagePrice, 3)
 
     print("Price: ", averagePrice)

@@ -8,6 +8,9 @@ from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout
 
 from time import sleep
+import datetime
+
+import csv
 
 import queue
 true = queue.Queue()
@@ -99,12 +102,9 @@ class Network(object):
         self.model.add(Dense(1))
         self.model.compile(loss='mean_squared_error', optimizer='adam')
 
-        history = self.model.fit(train_X, train_Y, epochs=200, batch_size=100, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
+        history = self.model.fit(train_X, train_Y, epochs=200, batch_size=1000, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
 
         yhat = self.model.predict(test_X)
-
-        #print("test_Y", test_Y)
-        #print("YHAT", yhat)
 
         scale = self.scale
         scaledPrice = self.scaledPrice
@@ -115,9 +115,9 @@ class Network(object):
         rmse_sent = sqrt(mean_squared_error(testY_inverse_sent, yhat_inverse_sent))
         print('Test RMSE: %.3f' % rmse_sent)
         
-        plt.figure(1)
-        plt.plot(testY_inverse_sent, label='true')
-        plt.plot(yhat_inverse_sent, label='predict')
+        #plt.figure(1)
+        plt.plot(test_Y, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
@@ -126,11 +126,11 @@ class Network(object):
         plt.savefig("True_Pred_Train.png")
         plt.close()
 
-        self.test_Y_updating = testY_inverse_sent
-        self.yhat_updating = yhat_inverse_sent
+        self.test_Y_updating = test_Y
+        self.yhat_updating = yhat
         
 
-    def future_trading(self, live_price, live_sentiment):
+    def future_trading(self, live_price, live_sentiment, predictions_file):
         price_file = pd.read_csv('data_collector/historical_prices.csv')
         previous_sent = pd.read_csv('data_collector/historical_tweets.csv')
         
@@ -157,7 +157,7 @@ class Network(object):
         sleep(3600)
 
         while True:
-            self.remodel(price_file, previous_sent, live_price, live_sentiment)
+            self.remodel(price_file, previous_sent, live_price, live_sentiment, predictions_file)
 
             sleep(3600)
 
@@ -219,21 +219,22 @@ class Network(object):
 
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        plt.figure(2)
-        plt.plot(testY_inverse, label='true')
-        plt.plot(yhat_inverse, label='predict')
+        #plt.figure(1)
+        plt.plot(testY, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train_1.png")
+        plt.close()
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
-        plt.figure(1)
+        #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
         plt.plot(self.yhat_updating, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -303,21 +304,22 @@ class Network(object):
 
         self.previous_val = yhat_inverse[0][0]
 
-        plt.figure(3)
-        plt.plot(testY_inverse, label='true')
-        plt.plot(yhat_inverse, label='predict')
+        #plt.figure(1)
+        plt.plot(testY, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train_2.png")
+        plt.close()
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
-        plt.figure(1)
+        #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
         plt.plot(self.yhat_updating, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -328,8 +330,7 @@ class Network(object):
         plt.savefig("True_Pred_Train.png")
         plt.close()
 
-        #Print current Trues and Predictions
-        print("Current Trues: ", list(true.queue))
+        #Print current Predictions
         print("Current Predictions: ", list(prediction.queue))
 
     def remodel3(self, price_file, previous_sent, live_price, live_sentiment):
@@ -387,21 +388,22 @@ class Network(object):
 
         self.previous_val = yhat_inverse[0][0]
 
-        plt.figure(4)
-        plt.plot(testY_inverse, label='true')
-        plt.plot(yhat_inverse, label='predict')
+        #plt.figure(1)
+        plt.plot(testY, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train_3.png")
+        plt.close()
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
-        plt.figure(1)
+        #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
         plt.plot(self.yhat_updating, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -412,8 +414,7 @@ class Network(object):
         plt.savefig("True_Pred_Train.png")
         plt.close()
 
-        #Print current Trues and Predictions
-        print("Current Trues: ", list(true.queue))
+        #Print current Predictions
         print("Current Predictions: ", list(prediction.queue))
 
     def remodel4(self, price_file, previous_sent, live_price, live_sentiment):
@@ -471,21 +472,22 @@ class Network(object):
 
         self.previous_val = yhat_inverse[0][0]
 
-        plt.figure(5)
-        plt.plot(testY_inverse, label='true')
-        plt.plot(yhat_inverse, label='predict')
+        #plt.figure(1)
+        plt.plot(testY, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
         plt.savefig("True_Pred_Train_4.png")
+        plt.close()
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
-        plt.figure(1)
+        #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
         plt.plot(self.yhat_updating, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -496,11 +498,10 @@ class Network(object):
         plt.savefig("True_Pred_Train.png")
         plt.close()
 
-        #Print current Trues and Predictions
-        print("Current Trues: ", list(true.queue))
+        #Print current Predictions
         print("Current Predictions: ", list(prediction.queue))
 
-    def remodel(self, price_file, previous_sent, live_price, live_sentiment):
+    def remodel(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
         price = pd.read_csv(live_price)
         sentiment = pd.read_csv(live_sentiment)
 
@@ -534,12 +535,12 @@ class Network(object):
         current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
 
-        if not hasattr(Network, 'testY_cont'):
-            self.testY_cont = pd.concat([self.testY_cont, testY_inverse], axis=0)
-            self.yhat_cont = pd.concat([self.yhat_cont, yhat_inverse], axis=0)
+        if hasattr(Network, 'testY_cont'):
+            self.testY_cont = pd.concat([self.testY_cont, testY], axis=0)
+            self.yhat_cont = pd.concat([self.yhat_cont, yhat], axis=0)
         else:
-            self.testY_cont = testY_inverse
-            self.yhat_cont = yhat_inverse
+            self.testY_cont = testY
+            self.yhat_cont = yhat
 
         if current_val >= self.threshold:
             print("Buy")
@@ -552,7 +553,7 @@ class Network(object):
 
         self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
-        plt.figure(6)
+        #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
         plt.plot(self.yhat_cont, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -564,10 +565,10 @@ class Network(object):
         plt.close()
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
-        plt.figure(1)
+        #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
         plt.plot(self.yhat_updating, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -578,9 +579,15 @@ class Network(object):
         plt.savefig("True_Pred_Train.png")
         plt.close()
 
-        #Print current Trues and Predictions
-        print("Current Trues: ", list(true.queue))
+        #Print current Predictions
         print("Current Predictions: ", list(prediction.queue))
+
+        now = datetime.datetime.now()
+
+        with open(predictions_file, mode='a') as csv_file:
+            writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
+            writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': yhat_inverse[0][0], 'current_price': price_tail.tail(), 'current_sentiment': sentiment_tail.tail()})
+
 
 
 if __name__ == "__main__":
@@ -591,10 +598,18 @@ if __name__ == "__main__":
 
     live_price = "data_collector/live_prices.csv"
     live_sentiment = "data_collector/live_sentiment.csv"
+    predictions_file = "data_collector/predictions.csv"
 
     price_file.columns = ["created_at","price"]
 
     tweet_file.columns = ["created_at","tweet","sentiment","compound"]
+
+    ## Create predictions file
+    with open(predictions_file, mode='w') as csv_file:
+        predictions_fieldnames = ['created_at', 'next_hour_price', 'current_price', 'current_sentiment']
+        writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
+
+        writer.writeheader()
     
     merged = pd.merge(left=price_file, right=tweet_file, how="inner")
     print("merge length", len(merged))
@@ -603,4 +618,4 @@ if __name__ == "__main__":
     network = Network(merged)
     network.data()
 
-    network.future_trading(live_price, live_sentiment)
+    network.future_trading(live_price, live_sentiment, predictions_file)

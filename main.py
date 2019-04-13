@@ -18,6 +18,8 @@ if __name__ == "__main__":
     ## Run scripts in background detatched
     with open('price_out.log', mode='a') as price:
         price_collector = subprocess.Popen(["python3", "-u","data_collector/prices/price_collector.py"], stdout = price)
+
+    sleep(60)
     with open('lstm_out.log', mode='a') as lstm:
         LSTM_Network = subprocess.Popen(["python3", "-u", "prediction_engine/LSTM.py"], stdout = lstm)
 
