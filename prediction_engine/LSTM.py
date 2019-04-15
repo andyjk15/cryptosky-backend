@@ -478,7 +478,7 @@ if __name__ == "__main__":
 
     live_price = "data_collector/live_prices.csv"
     live_sentiment = "data_collector/live_sentiment.csv"
-    predictions_file = "data_collector/predictions.csv"
+    predictions_file = "../cryptosky-frontend/app/predictions.csv"
 
     price_file.columns = ["created_at","price"]
 
