@@ -133,17 +133,17 @@ class Network(object):
         print(cat[0])
         cat = cat.tolist()
         xs = {}
-        with open('updating.json', mode='a') as file:
+        with open('updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
-            json.dump(xs, file)
+            json.dump(xs, file, indent=3)
 
 
     def future_trading(self, live_price, live_sentiment, predictions_file):
         price_file = pd.read_csv('data_collector/historical_prices.csv')
         previous_sent = pd.read_csv('data_collector/historical_tweets.csv')
         
-        self.threshold = 0.05
+        self.threshold = 0.25
         ## Train for initial 5          ## REALLY HAVE TO REFACT WHEN HAVE TIME
 
         sleep(3600)
@@ -151,23 +151,6 @@ class Network(object):
         for i in range(1,20):
             self.remodelloop(price_file, previous_sent, live_price, live_sentiment, i, predictions_file)
             sleep(3600)
-
-        #self.remodel1(price_file, previous_sent, live_price, live_sentiment)
-
-        #sleep(3600)
-
-        #self.remodel2(price_file, previous_sent, live_price, live_sentiment)
-
-        #sleep(3600)
-
-        #self.remodel3(price_file, previous_sent, live_price, live_sentiment)
-
-        #sleep(3600)
-
-        #self.remodel4(price_file, previous_sent, live_price, live_sentiment)
-        ## Then switch to looping as 5 exist in data
-
-        #sleep(3600)
 
         while True:
             self.remodel(price_file, previous_sent, live_price, live_sentiment, predictions_file)
@@ -248,6 +231,8 @@ class Network(object):
 
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
+        self.testY_cont = self.testY_cont.reshape(-1,1)
+
         #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
         plt.plot(self.yhat_cont, label='predict')
@@ -256,14 +241,16 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Train.png")
+        plt.savefig("True_Pred_Updating.png")
         plt.close()
 
-        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
         cat = cat.tolist()
-        comp = {index: x for index, x in enumerate(cat, start=1)}
-        with open('from_start.json', mode='a') as file:
-            json.dump(comp, file)
+        xs = {}
+        with open('from_start.json', mode='w') as file:
+            for x in range(len(cat)):
+                xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
+            json.dump(xs, file, indent=3)
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
@@ -272,10 +259,10 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('updating.json', mode='a') as file:
+        with open('updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
-            json.dump(xs, file)
+            json.dump(xs, file, indent=3)
 
         #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
@@ -287,26 +274,17 @@ class Network(object):
         plt.legend()
         plt.savefig("True_Pred_Train.png")
         plt.close()
-
-        cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
-        cat = cat.tolist()
-
-        print(cat)
-
-        comp = {index: x for index, x in enumerate(cat, start=1)}
-        with open('updating.json', mode='a') as file:
-            json.dump(comp, file)
         
         self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
         now = datetime.datetime.now()
         hour = yhat_inverse[0][0]
-        current = price_tail.tail()
-        senti = sentiment_tail.tail()
+        current = price_tail.tail(1)
+        senti = sentiment_tail.tail(1)
 
         print("hour ", hour)
-        print("current ", current)
-        print("senti ", senti)
+        current = current['price']
+        senti = senti['compound']
 
         try: 
             with open(predictions_file, mode='a') as csv_file:
@@ -317,360 +295,6 @@ class Network(object):
             sys.stdout.flush() 
 
         ### Create plot with and without sentiment modeled!!!
-
-    # def remodel1(self, price_file, previous_sent, live_price, live_sentiment):
-
-    #     price = pd.read_csv(live_price)
-    #     sentiment = pd.read_csv(live_sentiment)     
-
-    #     ## Will only be 1 entry so get 4 from history
-    #     last_4_price = price_file.tail(4)
-    #     last_4_sent = previous_sent.tail(4)
-
-    #     price_tail = price.tail()
-    #     sentiment_tail = sentiment.tail()
-
-    #     ## Index fix
-    #     last_4_price.index = last_4_price['created_at']
-    #     price_tail.index = price_tail['created_at']
-    #     last_4_sent.index = last_4_sent['created_at']
-    #     sentiment_tail.index = sentiment_tail['created_at']
-
-    #     tmp_previous_val = price_file.tail(1)
-
-    #     self.previous_val = tmp_previous_val['price'].values
-
-    #     ## Combine price and sents
-    #     price_tail = pd.concat([last_4_price, price_tail], axis=0)
-    #     sentiment_tail = pd.concat([last_4_sent, sentiment_tail], axis=0)
-
-    #     ## Example gets last 5 records for some reason
-
-    #     price = price_tail['price'].values.reshape(-1,1)
-    #     sentiment = sentiment_tail['compound'].values.reshape(-1,1)
-
-    #     price_scale = self.scale.fit_transform(price)
-
-    #     testX, testY = self.create_sets(price_scale, 2, sentiment)
-
-    #     testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-
-    #     yhat = self.model.predict(testX)
-    #     yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
-    #     testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
-
-    #     rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
-    #     print('Test RMSE: %.3f' % rmse_sent)
-        
-    #     true.put(price)
-    #     prediction.put(yhat_inverse[0])
-
-    #     current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
-
-    #     print("Current Value : ", current_val)
-
-    #     if current_val >= self.threshold:
-    #         print("Buy")
-    #     elif current_val < self.threshold:
-    #         print("Sell")
-    #     else:
-    #         print("Prediction Error!")
-
-    #     print("Predicted Price for next hour: ", yhat_inverse[0][0])
-
-    #     #plt.figure(1)
-    #     plt.plot(testY_inverse, label='true')
-    #     plt.plot(yhat_inverse, label='predict')
-    #     plt.title("Bitcoin Price Predictions")
-    #     plt.xlabel("Time - Hours")
-    #     plt.ylabel("Price")
-    #     plt.grid(axis='y', linestyle='-')
-    #     plt.legend()
-    #     plt.savefig("True_Pred_Train_1.png")
-    #     plt.close()
-
-    #     ## Updating plot
-    #     self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-    #     self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
-
-    #     #plt.figure(2)
-    #     plt.plot(self.test_Y_updating, label='true')
-    #     plt.plot(self.yhat_updating, label='predict')
-    #     plt.title("Bitcoin Price Predictions")
-    #     plt.xlabel("Time - Hours")
-    #     plt.ylabel("Price")
-    #     plt.grid(axis='y', linestyle='-')
-    #     plt.legend()
-    #     plt.savefig("True_Pred_Train.png")
-    #     plt.close()
-        
-    #     self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
-
-    #     ### Create plot with and without sentiment modeled!!!
-
-    # def remodel2(self, price_file, previous_sent, live_price, live_sentiment):
-
-    #     price = pd.read_csv(live_price)
-    #     sentiment = pd.read_csv(live_sentiment)     
-
-    #     ## Will only be 1 entry so get 4 from history
-    #     last_3_price = price_file.tail(3)
-    #     last_3_sent = previous_sent.tail(3)
-
-    #     price_tail = price.tail(2)
-    #     sentiment_tail = sentiment.tail(2)
-
-    #     last_3_price.index = last_3_price['created_at']
-    #     price_tail.index = price_tail['created_at']
-    #     last_3_sent.index = last_3_sent['created_at']
-    #     sentiment_tail.index = sentiment_tail['created_at']
-
-    #     ## Combine price and sents
-    #     price_tail = pd.concat([last_3_price, price_tail], axis=0)
-    #     sentiment_tail = pd.concat([last_3_sent, sentiment_tail], axis=0)
-
-    #     ## Example gets last 5 records for some reason
-
-    #     price = price_tail['price'].values.reshape(-1,1)
-    #     sentiment = sentiment_tail['compound'].values.reshape(-1,1)
-
-    #     price_scale = self.scale.fit_transform(price)
-
-    #     testX, testY = self.create_sets(price_scale, 2, sentiment)
-
-    #     testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-
-    #     yhat = self.model.predict(testX)
-    #     yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
-    #     testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
-
-    #     rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
-    #     print('Test RMSE: %.3f' % rmse_sent)
-
-    #     true.put(price)
-    #     prediction.put(yhat_inverse[0])
-
-    #     current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
-
-    #     print("Current Value : ", current_val)
-
-    #     if current_val >= self.threshold:
-    #         print("Buy")
-    #     elif current_val < self.threshold:
-    #         print("Sell")
-    #     else:
-    #         print("Prediction Error!")
-        
-    #     print("Predicted Price for next hour: ", yhat_inverse[0][0])
-
-    #     self.previous_val = yhat_inverse[0][0]
-
-    #     #plt.figure(1)
-    #     plt.plot(testY_inverse, label='true')
-    #     plt.plot(yhat_inverse, label='predict')
-    #     plt.title("Bitcoin Price Predictions")
-    #     plt.xlabel("Time - Hours")
-    #     plt.ylabel("Price")
-    #     plt.grid(axis='y', linestyle='-')
-    #     plt.legend()
-    #     plt.savefig("True_Pred_Train_2.png")
-    #     plt.close()
-
-    #     ## Updating plot
-    #     self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-    #     self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
-
-    #     #plt.figure(2)
-    #     plt.plot(self.test_Y_updating, label='true')
-    #     plt.plot(self.yhat_updating, label='predict')
-    #     plt.title("Bitcoin Price Predictions")
-    #     plt.xlabel("Time - Hours")
-    #     plt.ylabel("Price")
-    #     plt.grid(axis='y', linestyle='-')
-    #     plt.legend()
-    #     plt.savefig("True_Pred_Train.png")
-    #     plt.close()
-
-    # def remodel3(self, price_file, previous_sent, live_price, live_sentiment):
-
-    #     price = pd.read_csv(live_price)
-    #     sentiment = pd.read_csv(live_sentiment)     
-
-    #     ## Will only be 1 entry so get 4 from history
-    #     last_2_price = price_file.tail(2)
-    #     last_2_sent = previous_sent.tail(2)
-
-    #     price_tail = price.tail(3)
-    #     sentiment_tail = sentiment.tail(3)
-
-    #     last_2_price.index = last_2_price['created_at']
-    #     price_tail.index = price_tail['created_at']
-    #     last_2_sent.index = last_2_sent['created_at']
-    #     sentiment_tail.index = sentiment_tail['created_at']
-
-    #     ## Combine price and sents
-    #     price_tail = pd.concat([last_2_price, price_tail], axis=0)
-    #     sentiment_tail = pd.concat([last_2_sent, sentiment_tail], axis=0)
-
-    #     ## Example gets last 5 records for some reason
-
-    #     price = price_tail['price'].values.reshape(-1,1)
-    #     sentiment = sentiment_tail['compound'].values.reshape(-1,1)
-
-    #     price_scale = self.scale.fit_transform(price)
-
-    #     testX, testY = self.create_sets(price_scale, 2, sentiment)
-
-    #     testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-
-    #     yhat = self.model.predict(testX)
-    #     yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
-    #     testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
-
-    #     rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
-    #     print('Test RMSE: %.3f' % rmse_sent)
-
-    #     true.put(price)
-    #     prediction.put(yhat_inverse[0])
-
-    #     current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
-
-    #     print("Current Value : ", current_val)
-
-    #     if current_val >= self.threshold:
-    #         print("Buy")
-    #     elif current_val < self.threshold:
-    #         print("Sell")
-    #     else:
-    #         print("Prediction Error!")
-        
-    #     print("Predicted Price for next hour: ", yhat_inverse[0][0])
-
-    #     self.previous_val = yhat_inverse[0][0]
-
-    #     #plt.figure(1)
-    #     plt.plot(testY_inverse, label='true')
-    #     plt.plot(yhat_inverse, label='predict')
-    #     plt.title("Bitcoin Price Predictions")
-    #     plt.xlabel("Time - Hours")
-    #     plt.ylabel("Price")
-    #     plt.grid(axis='y', linestyle='-')
-    #     plt.legend()
-    #     plt.savefig("True_Pred_Train_3.png")
-    #     plt.close()
-
-    #     ## Updating plot
-    #     self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-    #     self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
-
-    #     #plt.figure(2)
-    #     plt.plot(self.test_Y_updating, label='true')
-    #     plt.plot(self.yhat_updating, label='predict')
-    #     plt.title("Bitcoin Price Predictions")
-    #     plt.xlabel("Time - Hours")
-    #     plt.ylabel("Price")
-    #     plt.grid(axis='y', linestyle='-')
-    #     plt.legend()
-    #     plt.savefig("True_Pred_Train.png")
-    #     plt.close()
-
-    # def remodel4(self, price_file, previous_sent, live_price, live_sentiment):
-
-        price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment)     
-
-        ## Will only be 1 entry so get 4 from history
-        last_1_price = price_file.tail()
-        last_1_sent = previous_sent.tail()
-
-        price_tail = price.tail(4)
-        sentiment_tail = sentiment.tail(4)
-
-        last_1_price.index = last_1_price['created_at']
-        price_tail.index = price_tail['created_at']
-        last_1_sent.index = last_1_sent['created_at']
-        sentiment_tail.index = sentiment_tail['created_at']
-
-        ## Combine price and sents
-        price_tail = pd.concat([last_1_price, price_tail], axis=0)
-        sentiment_tail = pd.concat([last_1_sent, sentiment_tail], axis=0)
-
-        ## Example gets last 5 records for some reason
-
-        price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
-
-        price_scale = self.scale.fit_transform(price)
-
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
-
-        testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
-
-        yhat = self.model.predict(testX)
-        yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
-        testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
-
-        rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
-        print('Test RMSE: %.3f' % rmse_sent)
-
-        true.put(price)
-        prediction.put(yhat_inverse[0])
-
-        current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
-
-        print("Current Value : ", current_val)
-
-        if current_val >= self.threshold:
-            print("Buy")
-        elif current_val < self.threshold:
-            print("Sell")
-        else:
-            print("Prediction Error!")
-        
-        print("Predicted Price for next hour: ", yhat_inverse[0][0])
-
-        self.previous_val = yhat_inverse[0][0]
-
-        #plt.figure(1)
-        plt.plot(testY_inverse, label='true')
-        plt.plot(yhat_inverse, label='predict')
-        plt.title("Bitcoin Price Predictions")
-        plt.xlabel("Time - Hours")
-        plt.ylabel("Price")
-        plt.grid(axis='y', linestyle='-')
-        plt.legend()
-        plt.savefig("True_Pred_Train_4.png")
-        plt.close()
-
-        ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
-
-        #plt.figure(2)
-        plt.plot(self.test_Y_updating, label='true')
-        plt.plot(self.yhat_updating, label='predict')
-        plt.title("Bitcoin Price Predictions")
-        plt.xlabel("Time - Hours")
-        plt.ylabel("Price")
-        plt.grid(axis='y', linestyle='-')
-        plt.legend()
-        plt.savefig("True_Pred_Train.png")
-        plt.close()
-
-        ## Output plots to jsons
-
-        json_y = testY_inverse.to_json(orient='split')
-        json_hat = yhat_inverse.to_json(orient='split')
-        #try:
-            #with open()
-
-        try: 
-            with open('updating.json', mode='a') as json:
-                writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
-                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti})
-        except Exception as e:
-            print("Error: %s" % str(e))
-            sys.stdout.flush() 
 
     def remodel(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
         price = pd.read_csv(live_price)
@@ -736,11 +360,13 @@ class Network(object):
         plt.savefig("True_Pred_Train_updating.png")
         plt.close()
 
-        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
         cat = cat.tolist()
-        comp = {index: x for index, x in enumerate(cat, start=1)}
-        with open('from_start.json', mode='a') as file:
-            json.dump(comp, file)
+        xs = {}
+        with open('from_start.json', mode='w') as file:
+            for x in range(len(cat)):
+                xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
+            json.dump(xs, file, indent=3)
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
@@ -749,10 +375,10 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('updating.json', mode='a') as file:
+        with open('updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
-            json.dump(xs, file)
+            json.dump(xs, file, indent=3)
 
         #plt.figure(2)
         plt.plot(self.test_Y_updating, label='true')
@@ -773,8 +399,8 @@ class Network(object):
         senti = sentiment_tail.tail()
 
         print("hour ", hour)
-        print("current ", current)
-        print("senti ", senti)
+        current = current['price']
+        senti = senti['compound']
 
         try: 
             with open(predictions_file, mode='a') as csv_file:
