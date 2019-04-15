@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 from nltk import wordpunct_tokenize
 from nltk.corpus import stopwords
-import datetime, time
+from datetime import datetime, timedelta
+import time
 
 import spam_filter
 
@@ -17,7 +18,7 @@ import analysis_engine.sentiment_analysis as sentiment_analysis
 
 # Provides list of unicode emojis for extraction
 import emoji as ji
- 
+
 from dotenv import load_dotenv
 from pathlib import Path  # python3 only
 env_path = Path('.') / 'data_collector/twitter/config/twitter.env'
@@ -40,7 +41,7 @@ class utilityFuncs():
     def cleanTweet(self, text):
         # Function to clean tweets, removes links and special characters
         return re.sub(r'([^0-9A-Za-z \-\%\£\$ \t])|(@[A-Za-z0-9]+)|(http\S+)', '', text), ' '.join(c for c in text if c in ji.UNICODE_EMOJI)
-    
+
     def removeSpacing(self, text):
         return re.sub(r'( +)', ' ', text)
 
@@ -51,7 +52,7 @@ class utilityFuncs():
 
     def remove_non_ascii(self, text):
         return ''.join(i for i in text if ord(i)<128)
-    
+
     def detectLaguage(self, text):
         """
         Calculate the probability of given text is written in several languages
@@ -69,7 +70,7 @@ class utilityFuncs():
             stopwords_set = set(stopwords.words(language))
             words_set = set(words)
             common_elements = words_set.intersection(stopwords_set)
-        
+
             language_ratios[language] = len(common_elements) # Ratio scores
 
         ratios = language_ratios
@@ -112,7 +113,7 @@ class Streamer():
         stream.filter(languages=["en"], track=hashtag)
 
 class Listener(StreamListener):
-    
+
     def __init__(self, tweets_file, temp_tweets, tweetFilter, analyser, time_limit=3000):
         self.tweets_file = tweets_file
         self.temp_tweets = temp_tweets
@@ -122,15 +123,15 @@ class Listener(StreamListener):
 
         self.start_time = time.time()
         self.limit = time_limit
-    
+
     def on_data(self, data):
-        
+
         if (time.time() - self.start_time) < self.limit:
 
-            now = datetime.datetime.now()
+            now = datetime.now() + timedelta(hours=1)
 
-            data = json.loads(data) 
-        
+            data = json.loads(data)
+
             try:
                 # Check if tweet is a retweet
                 if 'retweeted_status' in data:
@@ -215,7 +216,7 @@ class Listener(StreamListener):
         else:
             print("Console: ", "Ran for an hour. Closing stream..")
             return False
-          
+
     def on_error(self, status_code):
         if status_code == 420:
             return False
@@ -236,7 +237,7 @@ class filterSpam(object):
         self.data['class'] = self.data['classes'].map({'ham': 0, 'spam': 1})
 
         self.data.drop(['classes'], axis=1, inplace=True)
-    
+
         self.trainIndex, self.testIndex = list(), list()
         for i in range(self.data.shape[0]):
             if np.random.uniform(0, 1) < 0.75:
@@ -257,7 +258,7 @@ class filterSpam(object):
     def train(self):
         self.spamFilter = spam_filter.classifier(self.trainData)
         self.spamFilter.train()
-        
+
     def testData_Prediction(self):
         prediction = self.spamFilter.predict(self.testData['tweet'])
 
@@ -266,8 +267,8 @@ class filterSpam(object):
     def testPrediction(self):
 
         # Test Spam/Ham tweets - should return True and False respectivly
-        spam = spam_filter.processTweet("Earn more than 0015 btc free No deposit No investment Free Bitcoins - Earn $65 free btc in 5 minutes bitcoin freebtc getbtc") 
-        ham = spam_filter.processTweet("Bitcoin closed with some gains in month of February")    
+        spam = spam_filter.processTweet("Earn more than 0015 btc free No deposit No investment Free Bitcoins - Earn $65 free btc in 5 minutes bitcoin freebtc getbtc")
+        ham = spam_filter.processTweet("Bitcoin closed with some gains in month of February")
 
         hamTweet = self.spamFilter.classify(ham)
         spamTweet = self.spamFilter.classify(spam)
@@ -287,10 +288,10 @@ class filterSpam(object):
         classified = self.spamFilter.classify(processed)
 
         return classified
- 
+
 
 if __name__ == '__main__':
- 
+
     print("Console: ", "==== tweet_collector.py ====")
     sys.stdout.flush()
 
@@ -340,6 +341,6 @@ if __name__ == '__main__':
 
     print("Console: ", "Starting Twitter Streamer")
     sys.stdout.flush()
-    
+
     twitter_streamer = Streamer()
     twitter_streamer.stream_tweets(tweets_file, temp_tweets, hashtag, tweetFilter, analyser)

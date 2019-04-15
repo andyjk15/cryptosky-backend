@@ -32,7 +32,7 @@ if __name__ == "__main__":
             state = subprocess.Popen(["python3", "data_collector/twitter/tweet_collector.py"], stdin=subprocess.PIPE, stdout = tweet)
             stdout, stderr = state.communicate()
 
-            
+
 
             print(state.returncode)
             sleep(60)
@@ -43,8 +43,8 @@ if __name__ == "__main__":
                 hour_tweets = hour_tweets.drop_duplicates()
 
                 mean_compound = hour_tweets['compound'].mean()
-                
-                live_time = datetime.now() + timedelta(hours=1)
+
+                live_time = datetime.now() + timedelta(hours=2)
                 print(live_time)
                 try:
                     with open('data_collector/live_sentiment.csv', mode='a') as live:

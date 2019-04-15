@@ -8,7 +8,7 @@ from keras.models import Sequential
 from keras.layers import Dense, LSTM, Dropout
 
 from time import sleep
-import datetime
+from datetime import datetime, timedelta
 
 import csv, sys, json
 
@@ -29,8 +29,8 @@ class Network(object):
 
         loopback = 2        #MIGHT NEED TO JUSTIFY
 
-        train_X_nS, train_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=True)
-        test_X_nS, test_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=True)
+        train_X_nS, train_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=False)
+        test_X_nS, test_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=False)
 
         train_X, train_Y = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size], sent=True)
         test_X, test_Y = self.create_sets(self.price_test, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)], sent=True)
@@ -46,17 +46,15 @@ class Network(object):
         self.model_network_ns(train_X_nS, train_Y_nS, test_X_nS, train_Y_nS)
 
     def preprocess(self):
-        
+
         self.model_data = self.lstm_data[['price','compound']].groupby(self.lstm_data['created_at']).mean()
 
-        #print(self.model_data)
 
         self.sentiment_data = self.model_data['compound'].values.reshape(-1,1)
         self.price_data = self.model_data['price'].values.reshape(-1,1)
 
-        #print(type(self.sentiment_data))
-        # Unfortunately, I'd advice you to test your solution to such issues as currently no consistency in data types are guaranteed. 
-        # Usually - most of the transformers return data in a provided format so as long your base data is in float32 
+        # Unfortunately, I'd advice you to test your solution to such issues as currently no consistency in data types are guaranteed.
+        # Usually - most of the transformers return data in a provided format so as long your base data is in float32
         # - it will stay float32. But there are some edge cases like to_categorical.
         self.sentiment_data = self.sentiment_data.astype('float32')
         self.price_data = self.price_data.astype('float32')
@@ -120,7 +118,7 @@ class Network(object):
 
         rmse_sent = sqrt(mean_squared_error(testY_inverse_sent, yhat_inverse_sent))
         print('Test RMSE: %.3f' % rmse_sent)
-        
+
         #plt.figure(1)
         plt.plot(testY_inverse_sent, label='true')
         plt.plot(yhat_inverse_sent, label='predict')
@@ -136,7 +134,6 @@ class Network(object):
         self.yhat_updating = yhat_inverse_sent
 
         cat = np.concatenate((testY_inverse_sent, yhat_inverse_sent), axis=1)
-        print(cat[0])
         cat = cat.tolist()
         xs = {}
         with open('../cryptosky-frontend/app/updating.json', mode='w') as file:
@@ -178,7 +175,7 @@ class Network(object):
 
         rmse_sent = sqrt(mean_squared_error(testY_inverse_sent, yhat_inverse_sent))
         print('Test RMSE: %.3f' % rmse_sent)
-        
+
         #plt.figure(1)
         plt.plot(testY_inverse_sent, label='true')
         plt.plot(yhat_inverse_sent, label='predict')
@@ -191,7 +188,6 @@ class Network(object):
         plt.close()
 
         cat = np.concatenate((testY_inverse_sent, yhat_inverse_sent), axis=1)
-        print(cat[0])
         cat = cat.tolist()
         xs = {}
         with open('no_sent.json', mode='w') as file:
@@ -202,7 +198,7 @@ class Network(object):
     def future_trading(self, live_price, live_sentiment, predictions_file):
         price_file = pd.read_csv('data_collector/historical_prices.csv')
         previous_sent = pd.read_csv('data_collector/historical_tweets.csv')
-        
+
         self.threshold = 0.25
         ## Train for initial 5          ## REALLY HAVE TO REFACT WHEN HAVE TIME
 
@@ -220,7 +216,7 @@ class Network(object):
     def remodelloop(self, price_file, previous_sent, live_price, live_sentiment, tail, predictions_file):
 
         price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment) 
+        sentiment = pd.read_csv(live_sentiment)
 
         if hasattr(Network, 'last') and hasattr(Network, 'next'):
             self.last = self.last - 1
@@ -257,7 +253,7 @@ class Network(object):
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment, senti=True)
+        testX, testY = self.create_sets(price_scale, 2, sentiment, sent=True)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -267,7 +263,7 @@ class Network(object):
 
         rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
         print('Test RMSE: %.3f' % rmse_sent)
-        
+
         true.put(price)
         prediction.put(yhat_inverse[0])
 
@@ -304,7 +300,7 @@ class Network(object):
         plt.savefig("True_Pred_Updating.png")
         plt.close()
 
-        cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
+        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
         with open('../cryptosky-frontend/app/from_start.json', mode='w') as file:
@@ -334,10 +330,10 @@ class Network(object):
         plt.legend()
         plt.savefig("True_Pred_Train.png")
         plt.close()
-        
+
         self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
-        now = datetime.datetime.now()
+        now = datetime.now() + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail(1)
         senti = sentiment_tail.tail(1)
@@ -346,13 +342,13 @@ class Network(object):
         current = current['price']
         senti = senti['compound']
 
-        try: 
+        try:
             with open(predictions_file, mode='a') as csv_file:
                 writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
                 writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti})
         except Exception as e:
             print("Error: %s" % str(e))
-            sys.stdout.flush() 
+            sys.stdout.flush()
 
         ### Create plot with and without sentiment modeled!!!
 
@@ -373,7 +369,7 @@ class Network(object):
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment, senti=True)
+        testX, testY = self.create_sets(price_scale, 2, sentiment, sent=True)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -453,7 +449,7 @@ class Network(object):
 
         ## Output plots to jsons
 
-        now = datetime.datetime.now()
+        now = datetime.now() + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail()
         senti = sentiment_tail.tail()
@@ -462,13 +458,13 @@ class Network(object):
         current = current['price']
         senti = senti['compound']
 
-        try: 
+        try:
             with open(predictions_file, mode='a') as csv_file:
                 writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
                 writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti})
         except Exception as e:
             print("Error: %s" % str(e))
-            sys.stdout.flush() 
+            sys.stdout.flush()
 
 if __name__ == "__main__":
     print("Console: ", "Running Prediction Engine...")
@@ -490,7 +486,7 @@ if __name__ == "__main__":
         writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
 
         writer.writeheader()
-    
+
     merged = pd.merge(left=price_file, right=tweet_file, how="inner")
     print("merge length", len(merged))
     merged.to_csv('merged_lstm_data.csv')

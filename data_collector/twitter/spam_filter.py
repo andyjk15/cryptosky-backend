@@ -12,14 +12,14 @@ from tqdm import tqdm
 from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 from sklearn.metrics import confusion_matrix
 ## Test with XGBoost
-import xgboost as xgb
+#import xgboost as xgb
 
 
 ## Logic
 
 def processTweet(tweet, gram = 2):
     tweet = tweet.lower() #Lower cases
-    
+
     words = word_tokenize(tweet)    #Tokenise words in text
     words = [w for w in words if len(w) > 2]
 
@@ -34,7 +34,7 @@ def processTweet(tweet, gram = 2):
     words = [word for word in words if word not in sw]
 
     stemmer = PorterStemmer()           # Stem words
-    words = [stemmer.stem(word) for word in words]   
+    words = [stemmer.stem(word) for word in words]
 
     return words
 
@@ -114,12 +114,12 @@ class classifier(object):
             self.sumHam += self.probHam[word]
         for word in self.tfHam:
             self.probHam[word] = (self.probHam[word] + 1) / (self.sumHam + len(list(self.probHam.keys())))
-            
+
         self.probSpamTotal, self.probHamTotal = self.spam / self.total, self.ham / self.total
 
     def classify(self, processed):
         pSpam, pHam = 0, 0
-        for word in processed:                
+        for word in processed:
             if word in self.probSpam:
                 pSpam += log(self.probSpam[word])
             else:
@@ -127,11 +127,11 @@ class classifier(object):
             if word in self.probHam:
                 pHam += log(self.probHam[word])
             else:
-                pHam -= log(self.sumHam + len(list(self.probHam.keys()))) 
+                pHam -= log(self.sumHam + len(list(self.probHam.keys())))
             pSpam += log(self.probSpamTotal)
             pHam += log(self.probHamTotal)
         return pSpam >= pHam
-    
+
     def predict(self, testData):
         result = dict()
         for (i, tweet) in enumerate(testData):

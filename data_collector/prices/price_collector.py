@@ -2,7 +2,7 @@
 
 #Historical price collector
 import requests, os, sys, csv, json
-import datetime
+from datetime import datetime, timedelta
 
 from time import sleep
 
@@ -50,7 +50,7 @@ def bitfinex():
         sys.stdout.flush()
         price = 0
         return price
-    
+
 def gemini():
 
     try:
@@ -68,7 +68,7 @@ def gemini():
 
 def collector(priceCSV, fieldnames):
 
-    now = datetime.datetime.now()
+    now = datetime.now() + timedelta(hours=1)
 
     coinbase_P = coinbase()
     bitfinex_P = bitfinex()
