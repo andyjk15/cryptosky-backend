@@ -29,15 +29,21 @@ class Network(object):
 
         loopback = 2        #MIGHT NEED TO JUSTIFY
 
-        train_X, train_Y = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size])
-        test_X, test_Y = self.create_sets(self.price_test, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)])
+        train_X_nS, train_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=True)
+        test_X_nS, test_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=True)
 
-        #print(self.test_X)
+        train_X, train_Y = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size], sent=True)
+        test_X, test_Y = self.create_sets(self.price_test, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)], sent=True)
 
         train_X = np.reshape(train_X, (train_X.shape[0], 1, train_X.shape[1]))
         test_X = np.reshape(test_X, (test_X.shape[0], 1, test_X.shape[1]))
 
+        train_X_nS = np.reshape(train_X_nS, (train_X_nS.shape[0], 1, train_X_nS.shape[1]))
+        test_X_nS = np.reshape(test_X_nS, (test_X_nS.shape[0], 1, test_X_nS.shape[1]))
+
         self.model_network(train_X, train_Y, test_X, test_Y)
+
+        self.model_network_ns(train_X_nS, train_Y_nS, test_X_nS, train_Y_nS)
 
     def preprocess(self):
         
@@ -67,14 +73,14 @@ class Network(object):
         self.price_test = self.scaledPrice[self.price_train_size:len(self.scaledPrice):]
 
 
-    def create_sets(self, data, lookback, sentiment):
+    def create_sets(self, data, lookback, sentiment, sent):
         data_X, data_Y = [], []
         for i in range(len(data) - lookback):
             if i >= lookback:
                 pos = data[i-lookback:i+1, 0]
                 pos = pos.tolist()
-
-                pos.append(sentiment[i].tolist()[0])
+                if sent == True:
+                    pos.append(sentiment[i].tolist()[0])
 
                 data_X.append(pos)
                 data_Y.append(data[i + lookback, 0])
@@ -133,11 +139,65 @@ class Network(object):
         print(cat[0])
         cat = cat.tolist()
         xs = {}
-        with open('updating.json', mode='w') as file:
+        with open('../cryptosky-frontend/app/updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
 
+    def model_network_ns(self, train_X, train_Y, test_X, test_Y):
+        model = Sequential()
+
+        ## 1st layer - input layer
+        model.add(LSTM(100, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
+        model.add(Dropout(0.2))
+
+        ## 2nd Layer
+        model.add(LSTM(100, return_sequences=True))
+        model.add(Dropout(0.2))
+
+        ## 3rd Layer
+        model.add(LSTM(100, return_sequences=True))
+        model.add(Dropout(0.2))
+
+        ## 4th Layer without sequences
+        model.add(LSTM(100))
+        model.add(Dropout(0.2))
+
+        model.add(Dense(1))
+        model.compile(loss='mean_squared_error', optimizer='adam')
+
+        history = model.fit(train_X, train_Y, epochs=200, batch_size=1000, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
+
+        yhat = model.predict(test_X)
+
+        scale = self.scale
+        scaledPrice = self.scaledPrice
+
+        yhat_inverse_sent = scale.inverse_transform(yhat.reshape(-1, 1))
+        testY_inverse_sent = scale.inverse_transform(test_Y.reshape(-1, 1))
+
+        rmse_sent = sqrt(mean_squared_error(testY_inverse_sent, yhat_inverse_sent))
+        print('Test RMSE: %.3f' % rmse_sent)
+        
+        #plt.figure(1)
+        plt.plot(testY_inverse_sent, label='true')
+        plt.plot(yhat_inverse_sent, label='predict')
+        plt.title("Bitcoin Price Predictions")
+        plt.xlabel("Time - Hours")
+        plt.ylabel("Price")
+        plt.grid(axis='y', linestyle='-')
+        plt.legend()
+        plt.savefig("True_Pred_.png")
+        plt.close()
+
+        cat = np.concatenate((testY_inverse_sent, yhat_inverse_sent), axis=1)
+        print(cat[0])
+        cat = cat.tolist()
+        xs = {}
+        with open('no_sent.json', mode='w') as file:
+            for x in range(len(cat)):
+                xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
+            json.dump(xs, file, indent=3)
 
     def future_trading(self, live_price, live_sentiment, predictions_file):
         price_file = pd.read_csv('data_collector/historical_prices.csv')
@@ -197,7 +257,7 @@ class Network(object):
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2, sentiment, senti=True)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -247,7 +307,7 @@ class Network(object):
         cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('from_start.json', mode='w') as file:
+        with open('../cryptosky-frontend/app/from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -259,7 +319,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('updating.json', mode='w') as file:
+        with open('../cryptosky-frontend/app/updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -313,7 +373,7 @@ class Network(object):
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2, sentiment, senti=True)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -363,7 +423,7 @@ class Network(object):
         cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('from_start.json', mode='w') as file:
+        with open('../cryptosky-frontend/app/from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -375,7 +435,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('updating.json', mode='w') as file:
+        with open('../cryptosky-frontend/app/updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
