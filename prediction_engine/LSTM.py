@@ -205,7 +205,7 @@ class Network(object):
 
         sleep(3600)
 
-        for i in range(1,20):
+        for i in range(1,5):
             self.remodelloop(price_file, previous_sent, live_price, live_sentiment, i, predictions_file)
             sleep(3600)
 
@@ -223,7 +223,7 @@ class Network(object):
             self.last = self.last - 1
             self.next = self.next + 1
         else:
-            self.last = 19
+            self.last = 5
             self.next = tail
 
         ## Will only be 1 entry so get 4 from history
@@ -242,6 +242,7 @@ class Network(object):
         if tail <= 1:
             tmp_previous_val = price_file.tail(1)
             self.previous_val = tmp_previous_val['price'].values
+            print("Previous Value", self.previous_val)
 
         ## Combine price and sents
         price_tail = pd.concat([last_price, price_tail], axis=0)
