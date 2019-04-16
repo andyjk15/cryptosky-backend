@@ -29,8 +29,8 @@ class Network(object):
 
         loopback = 2        #MIGHT NEED TO JUSTIFY
 
-        train_X_nS, train_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=False)
-        test_X_nS, test_Y_nS = self.create_sets(self.price_train, loopback, 0, sent=False)
+        train_X_nS, train_Y_nS = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size], sent=False)
+        test_X_nS, test_Y_nS = self.create_sets(self.price_train, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)], sent=False)
 
         train_X, train_Y = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size], sent=True)
         test_X, test_Y = self.create_sets(self.price_test, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)], sent=True)
@@ -79,7 +79,8 @@ class Network(object):
                 pos = pos.tolist()
                 if sent == True:
                     pos.append(sentiment[i].tolist()[0])
-
+                else:
+                    pos.append(0)
                 data_X.append(pos)
                 data_Y.append(data[i + lookback, 0])
         return np.array(data_X), np.array(data_Y)
@@ -142,30 +143,30 @@ class Network(object):
             json.dump(xs, file, indent=3)
 
     def model_network_ns(self, train_X, train_Y, test_X, test_Y):
-        model = Sequential()
+        model_ns = Sequential()
 
         ## 1st layer - input layer
-        model.add(LSTM(100, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
-        model.add(Dropout(0.2))
+        model_ns.add(LSTM(100, input_shape=(train_X.shape[1], train_X.shape[2]), return_sequences=True))
+        model_ns.add(Dropout(0.2))
 
         ## 2nd Layer
-        model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.2))
+        model_ns.add(LSTM(100, return_sequences=True))
+        model_ns.add(Dropout(0.2))
 
         ## 3rd Layer
-        model.add(LSTM(100, return_sequences=True))
-        model.add(Dropout(0.2))
+        model_ns.add(LSTM(100, return_sequences=True))
+        model_ns.add(Dropout(0.2))
 
         ## 4th Layer without sequences
-        model.add(LSTM(100))
-        model.add(Dropout(0.2))
+        model_ns.add(LSTM(100))
+        model_ns.add(Dropout(0.2))
 
-        model.add(Dense(1))
-        model.compile(loss='mean_squared_error', optimizer='adam')
+        model_ns.add(Dense(1))
+        model_ns.compile(loss='mean_squared_error', optimizer='adam')
 
-        history = model.fit(train_X, train_Y, epochs=200, batch_size=1000, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
+        history = model_ns.fit(train_X, train_Y, epochs=200, batch_size=1000, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
 
-        yhat = model.predict(test_X)
+        yhat = model_ns.predict(test_X)
 
         scale = self.scale
         scaledPrice = self.scaledPrice
@@ -184,13 +185,13 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_.png")
+        plt.savefig("True_Pred_No_Sent.png")
         plt.close()
 
         cat = np.concatenate((testY_inverse_sent, yhat_inverse_sent), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('no_sent.json', mode='w') as file:
+        with open('../cryptosky-frontend/app/no_sent.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -238,9 +239,9 @@ class Network(object):
         last_sent.index = last_sent['created_at']
         sentiment_tail.index = sentiment_tail['created_at']
 
-        tmp_previous_val = price_file.tail(1)
-
-        self.previous_val = tmp_previous_val['price'].values
+        if tail <= 1:
+            tmp_previous_val = price_file.tail(1)
+            self.previous_val = tmp_previous_val['price'].values
 
         ## Combine price and sents
         price_tail = pd.concat([last_price, price_tail], axis=0)
@@ -339,8 +340,8 @@ class Network(object):
         senti = sentiment_tail.tail(1)
 
         print("hour ", hour)
-        current = current['price']
-        senti = senti['compound']
+        current = current['price'].item()
+        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
@@ -455,8 +456,8 @@ class Network(object):
         senti = sentiment_tail.tail()
 
         print("hour ", hour)
-        current = current['price']
-        senti = senti['compound']
+        current = current['price'].item()
+        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
