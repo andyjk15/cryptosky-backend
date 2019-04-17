@@ -47,8 +47,8 @@ class classifier(object):
         #self.MNB()
         #self.BNB()
         #self.xgboost()
-        self.TF_and_IDF()
-        self.TF_IDF()
+        self.TF_and_IDF()   ## Bag of Words
+        self.TF_IDF()       ## Term Frequecies
 
     def MNB(self):
         MNBClf = MultinomialNB()
@@ -91,7 +91,7 @@ class classifier(object):
                 else:
                     self.tfHam[word] = self.tfHam.get(word, 0) + 1
                     self.hamCount += 1
-                if word not in count:
+                if word not in count:       ## And below is Addictive Smoothing
                     count += [word]
             for word in count:
                 if self.labels[entry]:

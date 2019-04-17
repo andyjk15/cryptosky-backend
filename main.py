@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
                 mean_compound = hour_tweets['compound'].mean()
                 print(mean_compound)
-                live_time = datetime.now() + timedelta(hours=2)
+                live_time = datetime.now() + timedelta(hours=1)
                 print(live_time)
                 try:
                     with open('data_collector/live_sentiment.csv', mode='a') as live:

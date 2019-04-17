@@ -68,7 +68,7 @@ def gemini():
 
 def collector(priceCSV, fieldnames):
 
-    now = datetime.now() + timedelta(hours=1)
+    now = datetime.now()# + timedelta(hours=1)
 
     coinbase_P = coinbase()
     bitfinex_P = bitfinex()
