@@ -121,8 +121,8 @@ class Network(object):
         print('Test RMSE: %.3f' % rmse_sent)
 
         #plt.figure(1)
-        plt.plot(testY_inverse_sent, label='true')
-        plt.plot(yhat_inverse_sent, label='predict')
+        plt.plot(test_Y, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
@@ -131,10 +131,13 @@ class Network(object):
         plt.savefig("True_Pred_Train.png")
         plt.close()
 
-        self.test_Y_updating = testY_inverse_sent
-        self.yhat_updating = yhat_inverse_sent
+        test_Y = test_Y.reshape(-1,1)
 
-        cat = np.concatenate((testY_inverse_sent, yhat_inverse_sent), axis=1)
+        self.test_Y_updating = test_Y
+        self.yhat_updating = yhat
+
+        print(test_Y)
+        cat = np.concatenate((test_Y, yhat), axis=1)
         cat = cat.tolist()
         xs = {}
         with open('../cryptosky-frontend/app/updating.json', mode='w') as file:
@@ -178,8 +181,8 @@ class Network(object):
         print('Test RMSE: %.3f' % rmse_sent)
 
         #plt.figure(1)
-        plt.plot(testY_inverse_sent, label='true')
-        plt.plot(yhat_inverse_sent, label='predict')
+        plt.plot(test_Y, label='true')
+        plt.plot(yhat, label='predict')
         plt.title("Bitcoin Price Predictions")
         plt.xlabel("Time - Hours")
         plt.ylabel("Price")
@@ -188,7 +191,9 @@ class Network(object):
         plt.savefig("True_Pred_No_Sent.png")
         plt.close()
 
-        cat = np.concatenate((testY_inverse_sent, yhat_inverse_sent), axis=1)
+        test_Y = test_Y.reshape(-1,1)
+
+        cat = np.concatenate((test_Y, yhat), axis=1)
         cat = cat.tolist()
         xs = {}
         with open('../cryptosky-frontend/app/no_sent.json', mode='w') as file:
@@ -201,7 +206,6 @@ class Network(object):
         previous_sent = pd.read_csv('data_collector/historical_tweets.csv')
 
         self.threshold = 0.25
-        ## Train for initial 5          ## REALLY HAVE TO REFACT WHEN HAVE TIME
 
         sleep(3600)
 
@@ -269,9 +273,11 @@ class Network(object):
         true.put(price)
         prediction.put(yhat_inverse[0])
 
+        testY = testY.reshape(-1,1)
+
         if hasattr(Network, 'testY_cont'):
-            self.testY_cont = pd.concat([self.testY_cont, testY_inverse], axis=0)
-            self.yhat_cont = pd.concat([self.yhat_cont, yhat_inverse], axis=0)
+            self.testY_cont = pd.concat([self.testY_cont, testY], axis=0)
+            self.yhat_cont = pd.concat([self.yhat_cont, yhat], axis=0)
         else:
             self.testY_cont = testY
             self.yhat_cont = yhat
@@ -289,7 +295,7 @@ class Network(object):
 
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        self.testY_cont = self.testY_cont.reshape(-1,1)
+        #self.testY_cont = self.testY_cont.reshape(-1,1)
 
         #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
@@ -311,8 +317,8 @@ class Network(object):
             json.dump(xs, file, indent=3)
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
@@ -389,9 +395,11 @@ class Network(object):
 
         print("Current Value : ", current_val)
 
+        testY = testY.reshape(-1,1)
+
         if hasattr(Network, 'testY_cont'):
-            self.testY_cont = pd.concat([self.testY_cont, testY_inverse], axis=0)
-            self.yhat_cont = pd.concat([self.yhat_cont, yhat_inverse], axis=0)
+            self.testY_cont = pd.concat([self.testY_cont, testY], axis=0)
+            self.yhat_cont = pd.concat([self.yhat_cont, yhat], axis=0)
         else:
             self.testY_cont = testY
             self.yhat_cont = yhat
@@ -427,8 +435,8 @@ class Network(object):
             json.dump(xs, file, indent=3)
 
         ## Updating plot
-        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.test_Y_updating = np.concatenate((self.test_Y_updating, testY))
+        self.yhat_updating = np.concatenate((self.yhat_updating, yhat))
 
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
