@@ -14,15 +14,15 @@ if __name__ == "__main__":
 
         writer.writeheader()
 
-
     ## Run scripts in background detatched
     with open('price_out.log', mode='a') as price:
         price_collector = subprocess.Popen(["python3", "-u","data_collector/prices/price_collector.py"], stdout = price)
 
-    sleep(60)
+    sleep(30)
+
     with open('lstm_out.log', mode='a') as lstm:
         LSTM_Network = subprocess.Popen(["python3", "-u", "prediction_engine/LSTM.py"], stdout = lstm)
-
+    
     #sleep(3600)
     while True:
         ## Loop tweet collector for an hour
@@ -43,7 +43,7 @@ if __name__ == "__main__":
                 hour_tweets = hour_tweets.drop_duplicates()
 
                 mean_compound = hour_tweets['compound'].mean()
-                print(mean_compound)
+                
                 live_time = datetime.now() + timedelta(hours=1)
                 print(live_time)
                 try:

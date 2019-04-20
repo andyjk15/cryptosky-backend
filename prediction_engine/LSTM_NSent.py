@@ -27,26 +27,24 @@ class Network(object):
 
         loopback = 2        #MIGHT NEED TO JUSTIFY
 
-        train_X, train_Y = self.create_sets(self.price_train, loopback, self.sentiment_data[0:self.price_train_size])
-        test_X, test_Y = self.create_sets(self.price_test, loopback, self.sentiment_data[self.price_train_size:len(self.scaledPrice)])
+        train_X, train_Y = self.create_sets(self.price_train, loopback)
+        test_X, test_Y = self.create_sets(self.price_test, loopback)
 
         train_X = np.reshape(train_X, (train_X.shape[0], 1, train_X.shape[1]))
         test_X = np.reshape(test_X, (test_X.shape[0], 1, test_X.shape[1]))
 
         self.model_network(train_X, train_Y, test_X, test_Y)
 
+
     def preprocess(self):
 
-        self.model_data = self.lstm_data[['price','compound']].groupby(self.lstm_data['created_at']).mean()
+        self.model_data = self.lstm_data[['price']].groupby(self.lstm_data['created_at']).mean()
 
-
-        self.sentiment_data = self.model_data['compound'].values.reshape(-1,1)
         self.price_data = self.model_data['price'].values.reshape(-1,1)
 
         # Unfortunately, I'd advice you to test your solution to such issues as currently no consistency in data types are guaranteed.
         # Usually - most of the transformers return data in a provided format so as long your base data is in float32
         # - it will stay float32. But there are some edge cases like to_categorical.
-        self.sentiment_data = self.sentiment_data.astype('float32')
         self.price_data = self.price_data.astype('float32')
 
         self.scale = MinMaxScaler(feature_range=(0,1))
@@ -61,16 +59,12 @@ class Network(object):
         self.price_test = self.scaledPrice[self.price_train_size:len(self.scaledPrice):]
 
 
-    def create_sets(self, data, lookback, sentiment):#, sent):
+    def create_sets(self, data, lookback):
         data_X, data_Y = [], []
         for i in range(len(data) - lookback):
             if i >= lookback:
                 pos = data[i-lookback:i+1, 0]
                 pos = pos.tolist()
-                #if sent == True:
-                pos.append(sentiment[i].tolist()[0])
-                #else:
-                #    pos.append(0)
                 data_X.append(pos)
                 data_Y.append(data[i + lookback, 0])
         return np.array(data_X), np.array(data_Y)
@@ -99,7 +93,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/updating.json', mode='w') as file:
+        with open('data/no_sent_updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -175,7 +169,7 @@ class Network(object):
 
             ar = { i : self.scoresAr[i] for i in range(0, len(self.scoresAr))}
             xs = {}
-            with open('data/kfold.json', mode='w') as json_file:
+            with open('data/no_sent_kfold.json', mode='w') as json_file:
                 for x in ar:
                     print("BOOP")
                     xs[x] = {'index' : x, 'Acc': ar[x]}
@@ -237,7 +231,7 @@ class Network(object):
             recall = np.mean(recall_com)*10
 
             try:
-                with open('data/metrics.csv', mode='w') as csv_file:
+                with open('data/no_sent_metrics.csv', mode='w') as csv_file:
                     writer = csv.DictWriter(csv_file, fieldnames=['RSME', 'MSE', 'MAE', 'MAPE', 'Loss', 'f1', 'precision', 'recall'])
                     writer.writerow({'RSME': rmse_sent, 'MSE': mse, 'MAE': mae, 'MAPE': mape, 'Loss': loss, 'f1': f1, 'precision': precision, 'recall': recall})
             except Exception as e:
@@ -254,7 +248,7 @@ class Network(object):
             precision_com = { i : precision_com[i] for i in range(0, len(precision_com))}
             recall_com = { i : recall_com[i] for i in range(0, len(recall_com))}
 
-            with open('data/metrics_combined.json', mode='w') as json_file:
+            with open('data/no_sent_metrics_combined.json', mode='w') as json_file:
                 for x in f1_com:
                     xs[x] = {'index' : x, 'mean_squared_error': mse_com[x], 'mean_absolute_error' : mae_com[x], \
                         'mean_absolute_percentage_error': mape_com[x], 'loss': loss_com[x], 'f1': f1_com[x], 'precision': precision_com[x], \
@@ -263,9 +257,9 @@ class Network(object):
 
         return testY_inverse_sent, yhat_inverse_sent
 
-    def future_trading(self, live_price, live_sentiment, predictions_file):
+    def future_trading(self, live_price, predictions_file):
         price_file = pd.read_csv('data_collector/historical_prices.csv')
-        previous_sent = pd.read_csv('data_collector/historical_tweets.csv')
+        #previous_sent = pd.read_csv('data_collector/historical_tweets.csv')
 
         #print("PRICE FILE", price_file)
         
@@ -274,61 +268,54 @@ class Network(object):
 
         sleep(3600)
 
-        self.remodel1(price_file, previous_sent, live_price, live_sentiment, predictions_file)
+        self.remodel1(price_file, live_price, predictions_file)
 
         sleep(3600)
 
-        self.remodel2(price_file, previous_sent, live_price, live_sentiment, predictions_file)
+        self.remodel2(price_file, live_price, predictions_file)
 
         sleep(3600)
 
-        self.remodel3(price_file, previous_sent, live_price, live_sentiment, predictions_file)
+        self.remodel3(price_file, live_price, predictions_file)
 
         sleep(3600)
 
-        self.remodel4(price_file, previous_sent, live_price, live_sentiment, predictions_file)
+        self.remodel4(price_file, live_price, predictions_file)
         ## Then switch to looping as 5 exist in data
 
         sleep(3600)
 
         while True:
-            self.remodel(price_file, previous_sent, live_price, live_sentiment, predictions_file)
+            self.remodel(price_file, live_price, predictions_file)
 
             sleep(3600)
 
-    def remodel1(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
+    def remodel1(self, price_file, live_price, predictions_file):
 
-        price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment)     
+        price = pd.read_csv(live_price)   
 
         ## Will only be 1 entry so get 4 from history
         last_4_price = price_file.tail(4)
-        last_4_sent = previous_sent.tail(4)
 
         price_tail = price.tail()
-        sentiment_tail = sentiment.tail()
 
         ## Index fix
         last_4_price.index = last_4_price['created_at']
         price_tail.index = price_tail['created_at']
-        last_4_sent.index = last_4_sent['created_at']
-        sentiment_tail.index = sentiment_tail['created_at']
 
         tmp_previous_val = price_file.tail(1)
 
         self.previous_val = tmp_previous_val['price'].values
 
         price_tail = pd.concat([last_4_price, price_tail], axis=0)
-        sentiment_tail = pd.concat([last_4_sent, sentiment_tail], axis=0)
 
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -363,7 +350,7 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Updating.png")
+        plt.savefig("True_Pred_no_sent_Updating.png")
         plt.close()
 
         print("1: ", testY_inverse)
@@ -377,7 +364,7 @@ class Network(object):
         cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/from_start.json', mode='w') as file:
+        with open('data/no_sent_from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -393,7 +380,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/updating.json', mode='w') as file:
+        with open('data/no_sent_updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -406,7 +393,7 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Train.png")
+        plt.savefig("True_Pred_no_sent_Train.png")
         plt.close()
         
         self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
@@ -414,49 +401,40 @@ class Network(object):
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail(1)
-        senti = sentiment_tail.tail(1)
 
         print("hour ", hour)
         current = current['price'].item()
-        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
-                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'current_sentiment', 'state'])
-                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti, 'state': self.state})
+                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'state'])
+                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'state': self.state})
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
 
-    def remodel2(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
+    def remodel2(self, price_file, live_price, predictions_file):
 
-        price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment)     
+        price = pd.read_csv(live_price) 
 
         ## Will only be 1 entry so get 4 from history
         last_3_price = price_file.tail(3)
-        last_3_sent = previous_sent.tail(3)
 
         price_tail = price.tail(2)
-        sentiment_tail = sentiment.tail(2)
 
         last_3_price.index = last_3_price['created_at']
         price_tail.index = price_tail['created_at']
-        last_3_sent.index = last_3_sent['created_at']
-        sentiment_tail.index = sentiment_tail['created_at']
 
         ## Combine price and sents
         price_tail = pd.concat([last_3_price, price_tail], axis=0)
-        sentiment_tail = pd.concat([last_3_sent, sentiment_tail], axis=0)
 
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -493,8 +471,6 @@ class Network(object):
         print("2 cont: ", self.testY_cont)
         print("2 cont: ", self.yhat_cont)
         
-
-        #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
         plt.plot(self.yhat_cont, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -502,13 +478,13 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Updating.png")
+        plt.savefig("True_Pred_no_sent_Updating.png")
         plt.close()
 
         cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/from_start.json', mode='w') as file:
+        with open('data/no_sent_from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -523,12 +499,12 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/updating.json', mode='w') as file:
+        with open('data/no_sent_updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
 
-        #plt.figure(2)
+
         plt.plot(self.test_Y_updating, label='true')
         plt.plot(self.yhat_updating, label='predict')
         plt.title("Bitcoin Price Predictions")
@@ -536,56 +512,47 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Train.png")
+        plt.savefig("True_Pred_no_sent_Train.png")
         plt.close()
 
         #Print current Predictions
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail(1)
-        senti = sentiment_tail.tail(1)
 
         print("hour ", hour)
         current = current['price'].item()
-        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
-                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'current_sentiment', 'state'])
-                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti, 'state': self.state})
+                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'state'])
+                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'state': self.state})
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
 
-    def remodel3(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
+    def remodel3(self, price_file, live_price, predictions_file):
 
-        price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment)     
+        price = pd.read_csv(live_price)    
 
         ## Will only be 1 entry so get 4 from history
         last_2_price = price_file.tail(2)
-        last_2_sent = previous_sent.tail(2)
 
         price_tail = price.tail(3)
-        sentiment_tail = sentiment.tail(3)
 
         last_2_price.index = last_2_price['created_at']
         price_tail.index = price_tail['created_at']
-        last_2_sent.index = last_2_sent['created_at']
-        sentiment_tail.index = sentiment_tail['created_at']
 
         ## Combine price and sents
         price_tail = pd.concat([last_2_price, price_tail], axis=0)
-        sentiment_tail = pd.concat([last_2_sent, sentiment_tail], axis=0)
 
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -595,9 +562,6 @@ class Network(object):
 
         rmse_sent = sqrt(mean_squared_error(testY_inverse, yhat_inverse))
         print('Test RMSE: %.3f' % rmse_sent)
-
-        #true.put(price)
-        #prediction.put(yhat_inverse[0])
 
         current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
@@ -630,13 +594,13 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Updating.png")
+        plt.savefig("True_Pred_no_sent_Updating.png")
         plt.close()
 
         cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/from_start.json', mode='w') as file:
+        with open('data/no_sent_from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -651,7 +615,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/updating.json', mode='w') as file:
+        with open('data/no_sent_updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -664,56 +628,47 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Train.png")
+        plt.savefig("True_Pred_no_sent_Train.png")
         plt.close()
 
         #Print current Predictions
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail(1)
-        senti = sentiment_tail.tail(1)
 
         print("hour ", hour)
         current = current['price'].item()
-        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
-                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'current_sentiment', 'state'])
-                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti, 'state': self.state})
+                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'state'])
+                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'state': self.state})
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
 
-    def remodel4(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
+    def remodel4(self, price_file, live_price, predictions_file):
 
-        price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment)     
+        price = pd.read_csv(live_price)   
 
         ## Will only be 1 entry so get 4 from history
         last_1_price = price_file.tail()
-        last_1_sent = previous_sent.tail()
 
         price_tail = price.tail(4)
-        sentiment_tail = sentiment.tail(4)
 
         last_1_price.index = last_1_price['created_at']
         price_tail.index = price_tail['created_at']
-        last_1_sent.index = last_1_sent['created_at']
-        sentiment_tail.index = sentiment_tail['created_at']
 
         ## Combine price and sents
         price_tail = pd.concat([last_1_price, price_tail], axis=0)
-        sentiment_tail = pd.concat([last_1_sent, sentiment_tail], axis=0)
 
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -758,13 +713,13 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Updating.png")
+        plt.savefig("True_Pred_no_sent_Updating.png")
         plt.close()
 
         cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/from_start.json', mode='w') as file:
+        with open('data/no_sent_from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -779,7 +734,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/updating.json', mode='w') as file:
+        with open('data/no_sent_updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -792,45 +747,39 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Train.png")
+        plt.savefig("True_Pred_no_sent_Train.png")
         plt.close()
 
         #Print current Predictions
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail(1)
-        senti = sentiment_tail.tail(1)
 
         print("hour ", hour)
         current = current['price'].item()
-        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
-                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'current_sentiment', 'state'])
-                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti, 'state': self.state})
+                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'state'])
+                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'state': self.state})
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
 
-    def remodel(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
+    def remodel(self, price_file, live_price, predictions_file):
         price = pd.read_csv(live_price)
-        sentiment = pd.read_csv(live_sentiment)
 
         price_tail = price.tail(5)
-        sentiment_tail = sentiment.tail(5)
 
         price_tail.index = price_tail['created_at']
-        sentiment_tail.index = sentiment_tail['created_at']
 
         ## Example gets last 5 records for some reason
 
         price = price_tail['price'].values.reshape(-1,1)
-        sentiment = sentiment_tail['compound'].values.reshape(-1,1)
 
         price_scale = self.scale.fit_transform(price)
 
-        testX, testY = self.create_sets(price_scale, 2, sentiment)
+        testX, testY = self.create_sets(price_scale, 2)
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
@@ -872,7 +821,7 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_updating.png")
+        plt.savefig("True_Pred_no_sent_updating.png")
         plt.close()
 
         print("Y cont", self.testY_cont)
@@ -881,7 +830,7 @@ class Network(object):
         cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/from_start.json', mode='w') as file:
+        with open('data/no_sent_from_start.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -896,7 +845,7 @@ class Network(object):
         cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
         cat = cat.tolist()
         xs = {}
-        with open('data/updating.json', mode='w') as file:
+        with open('data/no_sent_updating.json', mode='w') as file:
             for x in range(len(cat)):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
@@ -909,7 +858,7 @@ class Network(object):
         plt.ylabel("Price")
         plt.grid(axis='y', linestyle='-')
         plt.legend()
-        plt.savefig("True_Pred_Train.png")
+        plt.savefig("True_Pred_no_sent_Train.png")
         plt.close()
 
         ## Output plots to jsons
@@ -917,17 +866,14 @@ class Network(object):
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
         current = price_tail.tail()
-        senti = sentiment_tail.tail()
 
         print("current ", current)
-        print("senti ", senti)
         current = current['price'].item()
-        senti = senti['compound'].item()
 
         try:
             with open(predictions_file, mode='a') as csv_file:
-                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'current_sentiment', 'state'])
-                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'current_sentiment': senti, 'state': self.state})
+                writer = csv.DictWriter(csv_file, fieldnames=['created_at', 'next_hour_price', 'current_price', 'state'])
+                writer.writerow({'created_at': now.strftime("%Y-%m-%d %H:00:00"), 'next_hour_price': hour, 'current_price': current, 'state': self.state})
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
@@ -935,29 +881,14 @@ class Network(object):
 if __name__ == "__main__":
     print("Console: ", "Running Prediction Engine...")
 
-    tweet_file = pd.read_csv("data_collector/historical_tweets.csv")
     price_file = pd.read_csv("data_collector/historical_prices.csv")
 
     live_price = "data_collector/live_prices.csv"
-    live_sentiment = "data_collector/live_sentiment.csv"
-    predictions_file = "data/predictions.csv"
+    predictions_file = "data/predictions_notsent.csv"
 
     price_file.columns = ["created_at","price"]
 
-    tweet_file.columns = ["created_at","tweet","sentiment","compound"]
-
-    ## Create predictions file
-    # with open(predictions_file, mode='w') as csv_file:
-    #     predictions_fieldnames =  []#['created_at', 'next_hour_price', 'current_price', 'current_sentiment']
-    #     writer = csv.DictWriter(csv_file, fieldnames=predictions_fieldnames)
-
-    #     writer.writeheader()
-
-    merged = pd.merge(left=price_file, right=tweet_file, how="inner")
-    print("merge length", len(merged))
-    merged.to_csv('merged_lstm_data.csv')
-
-    network = Network(merged)
+    network = Network(price_file)
     network.data()
 
-    network.future_trading(live_price, live_sentiment, predictions_file)
+    network.future_trading(live_price, predictions_file)
