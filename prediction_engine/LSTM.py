@@ -217,7 +217,7 @@ class Network(object):
             testY_inverse_sent = scale.inverse_transform(test_Y.reshape(-1, 1))
 
             rmse_sent = sqrt(mean_squared_error(testY_inverse_sent, yhat_inverse_sent))
-            print('Test RMSE: %.3f' % rmse_sent)
+            print('Test RMSE: %.3f' % rmse_sent/10)
 
             mse_com = history.history['mean_squared_error']
             mae_com = history.history['mean_absolute_error']
@@ -369,12 +369,13 @@ class Network(object):
         print("1: ", testY_inverse)
         print("1: ", yhat_inverse)
         self.testY_cont = testY_inverse
-        self.yhat_cont = yhat_inverse
+        self.yhat_cont = self.previous_val
 
         print("1 cont: ", self.testY_cont)
         print("1 cont: ", self.yhat_cont)
 
-        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        #cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        cat = np.insert(self.testY_cont, 0, self.yhat_cont)
         cat = cat.tolist()
         xs = {}
         with open('data/from_start.json', mode='w') as file:
@@ -382,15 +383,14 @@ class Network(object):
                 xs[x] = {'index' : x, 'testY_inverse': cat[x][0], 'yhat_inverse' : cat[x][1]}
             json.dump(xs, file, indent=3)
 
-
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.yhat_updating = np.insert(self.yhat_updating, 0, self.previous_val)
 
         print("Y updating", self.test_Y_updating, testY_inverse)
-        print("hat updating", self.yhat_updating, yhat_inverse)
+        print("hat updating", self.yhat_updating, self.previous_val)
 
-        cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
+        cat = np.insert(self.test_Y_updating, 0, self.yhat_updating)
         cat = cat.tolist()
         xs = {}
         with open('data/updating.json', mode='w') as file:
@@ -408,8 +408,6 @@ class Network(object):
         plt.legend()
         plt.savefig("True_Pred_Train.png")
         plt.close()
-        
-        self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
@@ -427,6 +425,8 @@ class Network(object):
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
+
+        self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
     def remodel2(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
 
@@ -483,16 +483,13 @@ class Network(object):
         
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        self.previous_val = yhat_inverse[0][0]
-
         self.testY_cont = np.concatenate((self.testY_cont, testY_inverse))  ## remove axis
-        self.yhat_cont = np.concatenate((self.yhat_cont, yhat_inverse))
+        self.yhat_cont = np.insert(self.yhat_cont, 0, self.previous_val)
         
         print("2: ", testY_inverse)
         print("2: ", yhat_inverse)
         print("2 cont: ", self.testY_cont)
         print("2 cont: ", self.yhat_cont)
-        
 
         #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
@@ -505,7 +502,7 @@ class Network(object):
         plt.savefig("True_Pred_Updating.png")
         plt.close()
 
-        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        cat = np.insert(self.testY_cont, 0, self.yhat_cont)
         cat = cat.tolist()
         xs = {}
         with open('data/from_start.json', mode='w') as file:
@@ -515,12 +512,12 @@ class Network(object):
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.yhat_updating = np.insert(self.yhat_updating, 0, self.previous_val)
 
         print("Y updating", self.test_Y_updating, testY_inverse)
         print("hat updating", self.yhat_updating, yhat_inverse)
 
-        cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
+        cat = np.insert(self.test_Y_updating, 0, self.yhat_updating)
         cat = cat.tolist()
         xs = {}
         with open('data/updating.json', mode='w') as file:
@@ -556,7 +553,9 @@ class Network(object):
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
-
+        
+        self.previous_val = yhat_inverse[0][0]
+    
     def remodel3(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
 
         price = pd.read_csv(live_price)
@@ -612,10 +611,8 @@ class Network(object):
         
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        self.previous_val = yhat_inverse[0][0]
-
         self.testY_cont = np.concatenate((self.testY_cont, testY_inverse))
-        self.yhat_cont = np.concatenate((self.yhat_cont, yhat_inverse))
+        self.yhat_cont = np.insert(self.yhat_cont, 0, self.previous_val)
 
         print("3: ", testY_inverse)
         print("3: ", yhat_inverse)
@@ -633,7 +630,7 @@ class Network(object):
         plt.savefig("True_Pred_Updating.png")
         plt.close()
 
-        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        cat = np.insert(self.testY_cont, 0, self.yhat_cont)
         cat = cat.tolist()
         xs = {}
         with open('data/from_start.json', mode='w') as file:
@@ -643,12 +640,12 @@ class Network(object):
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.yhat_updating = np.insert((self.yhat_updating, 0, self.previous_val))
         
         print("Y updating", self.test_Y_updating, testY_inverse)
-        print("hat updating", self.yhat_updating, yhat_inverse)
+        print("hat updating", self.yhat_updating, self.previous_val)
 
-        cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
+        cat = np.insert(self.test_Y_updating, 0, self.yhat_updating)
         cat = cat.tolist()
         xs = {}
         with open('data/updating.json', mode='w') as file:
@@ -684,6 +681,8 @@ class Network(object):
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
+            
+        self.previous_val = yhat_inverse[0][0]
 
     def remodel4(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
 
@@ -691,8 +690,8 @@ class Network(object):
         sentiment = pd.read_csv(live_sentiment)     
 
         ## Will only be 1 entry so get 4 from history
-        last_1_price = price_file.tail()
-        last_1_sent = previous_sent.tail()
+        last_1_price = price_file.tail(1)
+        last_1_sent = previous_sent.tail(1)
 
         price_tail = price.tail(4)
         sentiment_tail = sentiment.tail(4)
@@ -740,15 +739,13 @@ class Network(object):
         
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
 
-        self.previous_val = yhat_inverse[0][0]
-
         print("4: ", testY_inverse)
         print("4: ", yhat_inverse)
         print("4 cont: ", self.testY_cont)
         print("4 cont: ", self.yhat_cont)
 
         self.testY_cont = np.concatenate((self.testY_cont, testY_inverse))
-        self.yhat_cont = np.concatenate((self.yhat_cont, yhat_inverse))
+        self.yhat_cont = np.insert(self.yhat_cont, 0, self.previous_val)
 
         #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
@@ -761,7 +758,7 @@ class Network(object):
         plt.savefig("True_Pred_Updating.png")
         plt.close()
 
-        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
+        cat = np.insert(self.testY_cont, 0, self.yhat_cont)
         cat = cat.tolist()
         xs = {}
         with open('data/from_start.json', mode='w') as file:
@@ -771,12 +768,12 @@ class Network(object):
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.yhat_updating = np.insert(self.yhat_updating, 0, self.previous_val)
 
         print("Y updating", self.test_Y_updating, testY_inverse)
         print("hat updating", self.yhat_updating, yhat_inverse)
 
-        cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
+        cat = np.insert(self.test_Y_updating, 0, self.yhat_updating)
         cat = cat.tolist()
         xs = {}
         with open('data/updating.json', mode='w') as file:
@@ -813,6 +810,8 @@ class Network(object):
             print("Error: %s" % str(e))
             sys.stdout.flush()
 
+        self.previous_val = yhat_inverse[0][0]
+    
     def remodel(self, price_file, previous_sent, live_price, live_sentiment, predictions_file):
         price = pd.read_csv(live_price)
         sentiment = pd.read_csv(live_sentiment)
@@ -849,7 +848,7 @@ class Network(object):
         print("Current Value : ", current_val)
 
         self.testY_cont = np.concatenate((self.testY_cont, testY_inverse))
-        self.yhat_cont = np.concatenate((self.yhat_cont, yhat_inverse))
+        self.yhat_cont = np.insert(self.yhat_cont, 0, self.previous_val)
 
         if current_val >= self.threshold:
             print("Buy")
@@ -861,8 +860,6 @@ class Network(object):
             print("Prediction Error!")
 
         print("Predicted Price for next hour: ", yhat_inverse[0][0])
-
-        self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
         #plt.figure(1)
         plt.plot(self.testY_cont, label='true')
@@ -878,7 +875,7 @@ class Network(object):
         print("Y cont", self.testY_cont)
         print("hat cont", self.yhat_cont)
 
-        cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
+        cat = np.insert(self.testY_cont, 0, self.testY_cont)
         cat = cat.tolist()
         xs = {}
         with open('data/from_start.json', mode='w') as file:
@@ -888,12 +885,12 @@ class Network(object):
 
         ## Updating plot
         self.test_Y_updating = np.concatenate((self.test_Y_updating, testY_inverse))
-        self.yhat_updating = np.concatenate((self.yhat_updating, yhat_inverse))
+        self.yhat_updating = np.insert(self.yhat_updating, 0, self.previous_val)
 
         print("Y updating", self.test_Y_updating, testY_inverse)
         print("hat updating", self.yhat_updating, yhat_inverse)
 
-        cat = np.concatenate((self.test_Y_updating, self.yhat_updating), axis=1)
+        cat = np.insert(self.test_Y_updating, 0, self.yhat_updating)
         cat = cat.tolist()
         xs = {}
         with open('data/updating.json', mode='w') as file:
@@ -916,8 +913,8 @@ class Network(object):
 
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
-        current = price_tail.tail()
-        senti = sentiment_tail.tail()
+        current = price_tail.tail(1)
+        senti = sentiment_tail.tail(1)
 
         print("current ", current)
         print("senti ", senti)
@@ -931,6 +928,8 @@ class Network(object):
         except Exception as e:
             print("Error: %s" % str(e))
             sys.stdout.flush()
+
+        self.previous_val = yhat_inverse[0][0] ##THE NEXT PREDICTED VALUE IN AN HOUR
 
 if __name__ == "__main__":
     print("Console: ", "Running Prediction Engine...")

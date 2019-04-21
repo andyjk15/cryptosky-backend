@@ -1,42 +1,12 @@
 {
    "0": {
       "index": 0,
-      "testY_inverse": 5327.25,
-      "yhat_inverse": 5319.06494140625
+      "testY_inverse": 5319.697265625,
+      "yhat_inverse": 5295.344
    },
    "1": {
       "index": 1,
-      "testY_inverse": 5327.66,
-      "yhat_inverse": 5314.21923828125
-   },
-   "2": {
-      "index": 2,
-      "testY_inverse": 5322.182,
-      "yhat_inverse": 5316.93212890625
-   },
-   "3": {
-      "index": 3,
-      "testY_inverse": 5308.786,
-      "yhat_inverse": 5328.32373046875
-   },
-   "4": {
-      "index": 4,
-      "testY_inverse": 5327.25,
-      "yhat_inverse": 5319.06640625
-   },
-   "5": {
-      "index": 5,
-      "testY_inverse": 5327.66,
-      "yhat_inverse": 5314.27783203125
-   },
-   "6": {
-      "index": 6,
-      "testY_inverse": 5322.182,
-      "yhat_inverse": 5316.94677734375
-   },
-   "7": {
-      "index": 7,
-      "testY_inverse": 5326.071999999999,
-      "yhat_inverse": 5320.97119140625
+      "testY_inverse": 5318.045,
+      "yhat_inverse": 5309.73
    }
 }
