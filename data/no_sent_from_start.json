@@ -1,7 +1,17 @@
 {
    "0": {
       "index": 0,
-      "testY_inverse": 5318.045,
-      "yhat_inverse": 5295.344
+      "testY_inverse": 5310.16943359375,
+      "yhat_inverse": 5336.918000000001
+   },
+   "1": {
+      "index": 1,
+      "testY_inverse": 5307.3603515625,
+      "yhat_inverse": 5335.589
+   },
+   "2": {
+      "index": 2,
+      "testY_inverse": 5321.394,
+      "yhat_inverse": 5341.606
    }
 }
