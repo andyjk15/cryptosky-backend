@@ -212,6 +212,8 @@ class Network(object):
             self.model.add(Dense(1))
             self.model.compile(loss='mean_squared_error', optimizer='adam', metrics=['mse', 'mae', 'mape', self.f1_m, self.precision_m, self.recall_m])
 
+            self.model.summary()
+
             history = self.model.fit(train_X, train_Y, epochs=200, batch_size=1000, validation_data=(test_X, test_Y), verbose=0, shuffle=False, callbacks=[TQDMCallback()])
 
             yhat = self.model.predict(test_X)
@@ -275,8 +277,7 @@ class Network(object):
 
         #print("PRICE FILE", price_file)
         
-        self.threshold = 0.05
-        ## Train for initial 5          ## REALLY HAVE TO REFACT WHEN HAVE TIME
+        self.threshold = 0.025   #2.5% difference
 
         sleep(3600)
 
@@ -348,12 +349,12 @@ class Network(object):
         #true.put(price)
         #prediction.put(yhat_inverse[0])
 
-        current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
+        difference = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
-        if current_val >= self.threshold:
+        if difference >= self.threshold:
             print("Buy")
             self.state = 'BUY'
-        elif current_val < self.threshold:
+        elif difference < self.threshold:
             print("Sell")
             self.state = 'SELL'
         else:
@@ -465,6 +466,14 @@ class Network(object):
 
         testX = np.reshape(testX, (testX.shape[0], 1, testX.shape[1]))
 
+        '''
+        if self.previous_val != price_tail.head(1):
+            history = self.model.fit(testX, testY, epochs=5, batch_size=5, verbose=0, shuffle=False, callbacks=[TQDMCallback()])
+
+
+``      '''
+
+
         yhat = self.model.predict(testX)
         yhat_inverse = self.scale.inverse_transform(yhat.reshape(-1, 1))
         testY_inverse = self.scale.inverse_transform(testY.reshape(-1, 1))
@@ -475,12 +484,12 @@ class Network(object):
         #true.put(price)
         #prediction.put(yhat_inverse[0])
 
-        current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
+        difference = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
-        if current_val >= self.threshold:
+        if difference >= self.threshold:
             print("Buy")
             self.state = 'BUY'
-        elif current_val < self.threshold:
+        elif difference < self.threshold:
             print("Sell")
             self.state = 'SELL'
         else:
@@ -603,12 +612,12 @@ class Network(object):
         #true.put(price)
         #prediction.put(yhat_inverse[0])
 
-        current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
+        difference = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
-        if current_val >= self.threshold:
+        if difference >= self.threshold:
             print("Buy")
             self.state = 'BUY'
-        elif current_val < self.threshold:
+        elif difference < self.threshold:
             print("Sell")
             self.state = 'SELL'
         else:
@@ -731,12 +740,12 @@ class Network(object):
         #true.put(price)
         #prediction.put(yhat_inverse[0])
 
-        current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
+        difference = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
-        if current_val >= self.threshold:
+        if difference >= self.threshold:
             print("Buy")
             self.state = 'BUY'
-        elif current_val < self.threshold:
+        elif difference < self.threshold:
             print("Sell")
             self.state = 'SELL'
         else:
@@ -848,17 +857,17 @@ class Network(object):
         #true.put(price)
         #prediction.put(yhat_inverse[0])
 
-        current_val = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
+        difference = ((yhat_inverse[0][0]-self.previous_val)/self.previous_val)*100
 
-        print("Current Value : ", current_val)
+        print("Current Value : ", difference)
 
         self.testY_cont = np.concatenate((self.testY_cont, testY_inverse))
         self.yhat_cont = np.concatenate((self.yhat_cont, yhat_inverse))
 
-        if current_val >= self.threshold:
+        if difference >= self.threshold:
             print("Buy")
             self.state = 'BUY'
-        elif current_val < self.threshold:
+        elif difference < self.threshold:
             print("Sell")
             self.state = 'SELL'
         else:
@@ -880,7 +889,7 @@ class Network(object):
         print("Y cont", self.testY_cont)
         print("hat cont", self.yhat_cont)
 
-        cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
+        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
         with open('data/from_start.json', mode='w') as file:

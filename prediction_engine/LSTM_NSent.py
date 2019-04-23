@@ -824,7 +824,7 @@ class Network(object):
         print("Y cont", self.testY_cont)
         print("hat cont", self.yhat_cont)
 
-        cat = np.concatenate((self.testY_cont, self.testY_cont), axis=1)
+        cat = np.concatenate((self.testY_cont, self.yhat_cont), axis=1)
         cat = cat.tolist()
         xs = {}
         with open('data/no_sent_from_start.json', mode='w') as file:
@@ -862,7 +862,7 @@ class Network(object):
 
         now = datetime.now()# + timedelta(hours=1)
         hour = yhat_inverse[0][0]
-        current = price_tail.tail()
+        current = price_tail.tail(1)
 
         print("current ", current)
         current = current['price'].item()
